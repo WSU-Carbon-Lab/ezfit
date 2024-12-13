@@ -1,0 +1,10 @@
+version = 1
+requires-python = ">=3.12"
+
+[[package]]
+name = "ezfit"
+version = "0.1.0"
+source = { editable = "." }
+
+[package.metadata]
+requires-dist = [{ name = "ezfit", editable = "." }]

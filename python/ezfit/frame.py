@@ -1,11 +1,11 @@
 """Module for fitting data in a pandas DataFrame to a given model."""
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-
 from dataclasses import dataclass
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy.optimize import curve_fit
 
 
 class ColumnNotFoundError(Exception):
@@ -24,7 +24,6 @@ class Parameter:
     err: float = 0
 
     def __post_init__(self):
-        print(self.value, self.min, self.max, self.err)
         if self.min > self.max:
             raise ValueError("Minimum value must be less than maximum value.")
 
@@ -33,6 +32,9 @@ class Parameter:
 
         if self.err < 0:
             raise ValueError("Error must be non-negative.")
+
+    def __repr__(self):
+        return f"(value={self.value} ± {self.err}, bounds=({self.min}, {self.max}))"
 
 
 @dataclass
@@ -75,6 +77,11 @@ class Model:
             x, *[param.value + param.err for param in self.params.values()]
         )
         return nominal, lower, upper
+
+    def __repr__(self):
+        name = self.func.__name__
+        params = "\n".join([f"{v} : {param}" for v, param in self.params.items()])
+        return f"{name}:\n𝜒2: {self.𝜒2}\nreduced 𝜒2: {self.r𝜒2}\n{params}"
 
 
 @pd.api.extensions.register_dataframe_accessor("fit")
@@ -147,7 +154,6 @@ class FitAccessor:
             [param.min for param in data_model.params.values()],
             [param.max for param in data_model.params.values()],
         )
-        print(p0, bounds)
 
         popt, pcov, infodict, _, _ = curve_fit(
             data_model.func,
@@ -177,6 +183,7 @@ class FitAccessor:
         y: str,
         model: Model,
         yerr: str = None,
+        shaded_bounds: bool = True,
         ax=None,
         data_kwargs={},
         model_kwargs={},
@@ -216,13 +223,21 @@ class FitAccessor:
         xdata = self._df[x].values
         ydata = self._df[y].values
         yerr = self._df[yerr].values if yerr is not None else None
-        ymodel, ylow, yhigh = model(xdata)
 
-        ax.scatter(xdata, ydata, label=y, color="C0", **data_kwargs)
-        ax.plot(xdata, ymodel, color="C1", **model_kwargs)
-        ax.fill_between(
-            xdata, ylow, yhigh, alpha=0.5, label="Fit", color="C1", **model_kwargs
+        ax.errorbar(
+            xdata, ydata, yerr=yerr, label=y, fmt=".", color="C0", **data_kwargs
         )
+
+        if shaded_bounds:
+            ymodel, ylow, yhigh = model(xdata, bounds=True)
+            plt.plot(xdata, ymodel, color="C1", **model_kwargs)
+            ax.fill_between(
+                xdata, ylow, yhigh, alpha=0.5, label="Fit", color="C1", **model_kwargs
+            )
+        else:
+            ymodel = model(xdata)
+            ax.plot(xdata, ymodel, color="C1", **model_kwargs)
+
         ax.set_xlabel(x)
         ax.set_ylabel(y)
         ax.legend()
@@ -231,15 +246,3 @@ class FitAccessor:
             ax,
             model,
         )
-
-
-if __name__ == "__main__":
-    line = lambda x, a, b: a * x + b
-    test_data = pd.DataFrame(
-        {
-            "x": np.linspace(0, 10, 100),
-            "y": np.linspace(0, 10, 100) + np.random.normal(0, 1, 100),
-        }
-    )
-    ax = test_data.fit(line, "x", "y")
-    plt.show()
