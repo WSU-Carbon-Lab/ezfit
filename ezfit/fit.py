@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
+import inspect
+
+from typing import Optional, Dict
 
 
 class ColumnNotFoundError(Exception):
@@ -36,6 +39,11 @@ class Parameter:
     def __repr__(self):
         return f"(value={self.value} ± {self.err}, bounds=({self.min}, {self.max}))"
 
+    def random(self) -> float:
+        """Returns a valid random value within the bounds."""
+        param = np.random.normal(self.value, min(self.err, 1))
+        return np.clip(param, self.min, self.max)
+
 
 @dataclass
 class Model:
@@ -51,8 +59,7 @@ class Model:
         """Generate a list of parameters from the function signature."""
         if self.params is None:
             self.params = {}
-
-        for i, name in enumerate(self.func.__code__.co_varnames):
+        for i, name in enumerate(inspect.signature(self.func).parameters):
             if i == 0:
                 continue
 
@@ -63,25 +70,21 @@ class Model:
             )
 
     def __call__(
-        self, x, bounds=False
+        self, x
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | np.ndarray:
         """Evaluate the model at the given x values."""
         nominal = self.func(x, *[param.value for param in self.params.values()])
-        if not bounds:
-            return nominal
-
-        lower = self.func(
-            x, *[param.value - param.err for param in self.params.values()]
-        )
-        upper = self.func(
-            x, *[param.value + param.err for param in self.params.values()]
-        )
-        return nominal, lower, upper
+        return nominal
 
     def __repr__(self):
         name = self.func.__name__
         params = "\n".join([f"{v} : {param}" for v, param in self.params.items()])
         return f"{name}:\n𝜒2: {self.𝜒2}\nreduced 𝜒2: {self.r𝜒2}\n{params}"
+
+    def random(self, x):
+        """Returns a valid random value within the bounds."""
+        params= np.array([param.random() for param in self.params.values()])
+        return self.func(x, *params)
 
 
 @pd.api.extensions.register_dataframe_accessor("fit")
@@ -107,7 +110,7 @@ class FitAccessor:
             self.plot(x, y, model, yerr, ax, **plot_kwargs)
             plt.show()
             return model, ax
-        return model
+        return model, None
 
     def fit(
         self,
@@ -146,7 +149,7 @@ class FitAccessor:
 
         xdata = self._df[x].values
         ydata = self._df[y].values
-        yerr = self._df[yerr].values if yerr is not None else None
+        yerr = self._df[yerr].values if yerr is not None else [1] * len(xdata)
 
         data_model = Model(model, parameters)
         p0 = [param.value for param in data_model.params.values()]
@@ -154,6 +157,7 @@ class FitAccessor:
             [param.min for param in data_model.params.values()],
             [param.max for param in data_model.params.values()],
         )
+        print(data_model)
 
         popt, pcov, infodict, _, _ = curve_fit(
             data_model.func,
@@ -183,10 +187,9 @@ class FitAccessor:
         y: str,
         model: Model,
         yerr: str = None,
-        shaded_bounds: bool = True,
         ax=None,
-        data_kwargs={},
-        model_kwargs={},
+        data_kwargs:Optional[Dict] = None,
+        model_kwargs:Optional[Dict] = None,
     ):
         """Plot the data and the model on the given axis.
 
@@ -208,6 +211,11 @@ class FitAccessor:
         matplotlib.axes.Axes
             The axis with the plot.
         """
+        if data_kwargs is None:
+            data_kwargs = {}
+        if model_kwargs is None:
+            model_kwargs = {}
+
         if ax is None:
             ax = plt.gca()
 
@@ -220,29 +228,20 @@ class FitAccessor:
         if yerr is not None and yerr not in self._df.columns:
             raise ColumnNotFoundError(yerr)
 
+        # Extract data
         xdata = self._df[x].values
         ydata = self._df[y].values
-        yerr = self._df[yerr].values if yerr is not None else None
+        yerr_values = self._df[yerr].values if yerr is not None else None
 
         ax.errorbar(
-            xdata, ydata, yerr=yerr, label=y, fmt=".", color="C0", **data_kwargs
+        xdata, ydata, yerr=yerr_values, fmt=".", color="C0", label=y, **data_kwargs
         )
+        nominal = model(xdata)
 
-        if shaded_bounds:
-            ymodel, ylow, yhigh = model(xdata, bounds=True)
-            plt.plot(xdata, ymodel, color="C1", **model_kwargs)
-            ax.fill_between(
-                xdata, ylow, yhigh, alpha=0.5, label="Fit", color="C1", **model_kwargs
-            )
-        else:
-            ymodel = model(xdata)
-            ax.plot(xdata, ymodel, color="C1", **model_kwargs)
+        ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
 
+        # Labels and legend
         ax.set_xlabel(x)
         ax.set_ylabel(y)
         ax.legend()
-
-        return (
-            ax,
-            model,
-        )
+        return ax
