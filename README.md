@@ -9,7 +9,7 @@ There are four prerequisite functions for installing ezfit, pandas, numpy, matpl
 and scipy. The package can be installed though the terminal with the following
 command.
 ```
-pip install numpy pandas matplotlib ezfit
+pip install ezfit numpy pandas matplotlib
 ```
 
 ## How to Use
