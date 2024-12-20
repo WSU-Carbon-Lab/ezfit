@@ -94,7 +94,7 @@ is an unknown number of space characters between collumns. Putting this together
 we have
 
 ```python
-df = pd.read_csv("path_to_file", sep = "\s+", skiprows=1)
+df = pd.read_csv("path_to_file", sep=r"\s+", skiprows=1)
 
 # printing the head gives us
 print(df.head(2))

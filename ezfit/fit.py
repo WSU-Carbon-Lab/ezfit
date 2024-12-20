@@ -21,7 +21,8 @@ class ColumnNotFoundError(Exception):
 class Parameter:
     """Data class for a parameter and its bounds."""
 
-    value: float = 0.0
+    value: float
+    fixed: bool = False
     min: float = -np.inf
     max: float = np.inf
     err: float = 0
@@ -36,7 +37,13 @@ class Parameter:
         if self.err < 0:
             raise ValueError("Error must be non-negative.")
 
+        if self.fixed:
+            self.min = self.value - np.finfo(float).eps
+            self.max = self.value + np.finfo(float).eps
+
     def __repr__(self):
+        if self.fixed:
+            return f"(value={self.value:.10f}, fixed=True)"
         return f"(value={self.value} ± {self.err}, bounds=({self.min}, {self.max}))"
 
     def random(self) -> float:
@@ -59,19 +66,17 @@ class Model:
         """Generate a list of parameters from the function signature."""
         if self.params is None:
             self.params = {}
+
         for i, name in enumerate(inspect.signature(self.func).parameters):
             if i == 0:
                 continue
-
             self.params[name] = (
                 Parameter()
                 if name not in self.params
                 else Parameter(**self.params[name])
             )
 
-    def __call__(
-        self, x
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | np.ndarray:
+    def __call__(self, x) -> tuple[np.ndarray, np.ndarray, np.ndarray] | np.ndarray:
         """Evaluate the model at the given x values."""
         nominal = self.func(x, *[param.value for param in self.params.values()])
         return nominal
@@ -83,7 +88,7 @@ class Model:
 
     def random(self, x):
         """Returns a valid random value within the bounds."""
-        params= np.array([param.random() for param in self.params.values()])
+        params = np.array([param.random() for param in self.params.values()])
         return self.func(x, *params)
 
 
@@ -188,8 +193,8 @@ class FitAccessor:
         model: Model,
         yerr: str = None,
         ax=None,
-        data_kwargs:Optional[Dict] = None,
-        model_kwargs:Optional[Dict] = None,
+        data_kwargs: Optional[Dict] = None,
+        model_kwargs: Optional[Dict] = None,
     ):
         """Plot the data and the model on the given axis.
 
@@ -234,7 +239,7 @@ class FitAccessor:
         yerr_values = self._df[yerr].values if yerr is not None else None
 
         ax.errorbar(
-        xdata, ydata, yerr=yerr_values, fmt=".", color="C0", label=y, **data_kwargs
+            xdata, ydata, yerr=yerr_values, fmt=".", color="C0", label=y, **data_kwargs
         )
         nominal = model(xdata)
 
