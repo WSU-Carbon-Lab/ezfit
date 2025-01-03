@@ -21,7 +21,7 @@ class ColumnNotFoundError(Exception):
 class Parameter:
     """Data class for a parameter and its bounds."""
 
-    value: float
+    value: float = 1
     fixed: bool = False
     min: float = -np.inf
     max: float = np.inf
@@ -253,3 +253,20 @@ class FitAccessor:
         ax.set_ylabel(y)
         ax.legend()
         return ax
+
+
+if __name__ == "__main__":
+
+    def line(x, m, b):
+        return m * x + b
+
+    test_data = pd.DataFrame(
+        {
+            "x": np.linspace(0, 10, 100),
+            "y": np.linspace(0, 10, 100) + np.random.normal(0, 0.75, 100),
+            "y_err": np.sqrt(np.linspace(0, 10, 100)) / 5 + 1,
+        }
+    )
+    model, ax = test_data.fit(line, "x", "y", "y_err")
+    print(model)
+    plt.show()
