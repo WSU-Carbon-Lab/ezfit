@@ -281,32 +281,3 @@ class FitAccessor:
         ax.set_ylabel(y)
         ax.legend()
         return ax
-
-
-if __name__ == "__main__":
-
-    from pathlib import Path
-
-    from functions import linear, pseudo_voigt
-
-    def peak(x, height, center, fwhm, eta, m, b):
-        return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
-
-    df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
-    df["logI"] = np.log(df["intensity"])
-    # propogate uncertianty to the intU col
-    # δlog(I) = δI / I
-    df["logintU"] = df["intU"] / df["intensity"]
-    pk1 = df.query("0.3 < qVal < 0.45")
-
-    model, ax = pk1.fit(
-        peak,
-        "qVal",
-        "logI",
-        "logintU",
-        center={"value": 0.37, "min": 0.35, "max": 0.38},
-        fwhm={"value": 0.11, "min": 0, "max": 0.2},
-        m={"value": -3, "max": 0},
-        eta={"value": 1, "min": 0, "max": 1},
-    )
-    print(model)
