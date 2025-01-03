@@ -4,7 +4,7 @@ from ezfit.functions import (
     exponential,
     gaussian,
     lorentzian,
-    psudo_voigt,
+    pseudo_voigt,
     linear,
 )
 
@@ -18,6 +18,6 @@ __all__ = [
     "exponential",
     "gaussian",
     "lorentzian",
-    "psudo_voigt",
+    "pseudo_voigt",
     "linear",
 ]
