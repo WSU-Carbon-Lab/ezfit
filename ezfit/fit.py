@@ -188,7 +188,6 @@ class FitAccessor:
         data_model = Model(model, parameters)
         p0 = data_model.values()
         bounds = data_model.bounds()
-        print(p0, bounds)
 
         popt, pcov, infodict, _, _ = curve_fit(
             data_model.func,
