@@ -142,7 +142,6 @@ class FitAccessor:
         if plot:
             ax = plt.gca()
             self.plot(x, y, model, yerr, ax, **plot_kwargs)
-            plt.show()
             return model, ax
         return model, None
 
@@ -278,3 +277,30 @@ class FitAccessor:
         ax.set_ylabel(y)
         ax.legend()
         return ax
+
+
+# if __name__ == "__main__":
+
+# from pathlib import Path
+
+# from functions import linear, pseudo_voigt
+
+# def peak(x, height, center, fwhm, eta, m, b):
+#     return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
+
+# df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
+# pk1 = df.query("0.3 < qVal < 0.45")
+
+# model, ax = pk1.fit(
+#     peak,
+#     "qVal",
+#     "intensity",
+#     "intU",
+#     height={"value": 100000, "min": 0},
+#     center={"value": 0.39},
+#     fwhm={"value": 0.02, "max": 0.1},
+#     m={"value": -3, "max": 0},
+#     eta={"value": 1, "min": 0, "max": 1},
+# )
+# print(model)
+# plt.show()

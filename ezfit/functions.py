@@ -6,9 +6,6 @@ from numba import njit, prange
 
 @njit(parallel=True, fastmath=True)
 def power_law(x, a, b):
-    """
-    Power-law model: y = a * x^b
-    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):
@@ -18,9 +15,6 @@ def power_law(x, a, b):
 
 @njit(parallel=True, fastmath=True)
 def exponential(x, a, b):
-    """
-    Exponential model: y = a * exp(b * x)
-    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):
@@ -29,60 +23,74 @@ def exponential(x, a, b):
 
 
 @njit(parallel=True, fastmath=True)
-def gaussian(x, height, center, std):
+def gaussian(x, amplitude, center, fwhm):
     """
-    Gaussian model: y = height * exp(-((x - center)^2) / (2 * std^2))
+    Gaussian with peak = 'amplitude' and FWHM = 'fwhm'.
+
+    Formula:
+      G(x) = amplitude * exp[-4 ln(2) * ((x - center) / fwhm)^2]
+
+    At x=center, G = amplitude.
+    The half max occurs at |x-center| = fwhm/2.
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
-    denom = 2.0 * (std * std)
+    c = 4.0 * math.log(2.0)  # ~2.7726
     for i in prange(n):
-        dx = x[i] - center
-        out[i] = height * math.exp(-(dx * dx) / denom)
+        dx = (x[i] - center) / fwhm
+        out[i] = amplitude * math.exp(-c * dx * dx)
     return out
 
 
 @njit(parallel=True, fastmath=True)
-def lorentzian(x, height, peak_position, fwhm):
+def lorentzian(x, amplitude, center, fwhm):
     """
-    Lorentzian model: y = height / [1 + ((x - peak_position)^2 / fwhm^2)]
+    Lorentzian with peak = 'amplitude' and FWHM = 'fwhm'.
+
+    L(x) = amplitude * [ (fwhm/2)^2 / ((x-center)^2 + (fwhm/2)^2 ) ]
+
+    At x=center, L = amplitude.
+    The half max occurs at |x-center| = fwhm/2.
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
-    fwhm2 = fwhm * fwhm
+    gamma = 0.5 * fwhm
+    gamma2 = gamma * gamma
     for i in prange(n):
-        dx = x[i] - peak_position
-        out[i] = height / (1.0 + (dx * dx) / fwhm2)
+        dx = x[i] - center
+        out[i] = amplitude * (gamma2 / (dx * dx + gamma2))
     return out
 
 
 @njit(parallel=True, fastmath=True)
 def pseudo_voigt(x, height, center, fwhm, eta):
     """
-    Pseudo-Voigt model:
-        y = (1 - eta) * Gaussian(x) + eta * Lorentzian(x)
+    Pseudo-Voigt model (peak-based):
+        y = height * [ (1 - eta)*G + eta*L ]
 
-    Note: The Gaussian std is related to FWHM by:
-        std = FWHM / (2 * sqrt(2 ln(2)))
+    where G and L have the same FWHM = 'fwhm' and both peak at 1.0
+    when we pass amplitude=1.
+
+    That is:
+      G(x) = 1 * exp[-4 ln(2) * ((x-center)/fwhm)^2]
+      L(x) = 1 * ((fwhm/2)^2 / ((x-center)^2 + (fwhm/2)^2))
+
+    Then the final amplitude is scaled by 'height'.
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
 
-    # Precompute Gaussian and Lorentzian shapes with height=1, then scale later.
-    std = fwhm * 0.75845731515  # FWHM_TO_SIGMA
-    gauss_part = gaussian(x, 1.0, center, std)  # parallel call
-    lorentz_part = lorentzian(x, 1.0, center, fwhm)  # parallel call
+    gauss_part = gaussian(x, 1.0, center, fwhm)  # peak=1
+    lorentz_part = lorentzian(x, 1.0, center, fwhm)  # peak=1
 
     for i in prange(n):
+        # Weighted sum: (1-eta)*Gauss + eta*Lorentz, then scale by 'height'
         out[i] = height * ((1.0 - eta) * gauss_part[i] + eta * lorentz_part[i])
     return out
 
 
 @njit(parallel=True, fastmath=True)
 def linear(x, m, b):
-    """
-    Linear model: y = m*x + b
-    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):

@@ -13,7 +13,7 @@ name = "ezfit"
 readme = "README.md"
 repository = "https://github.com/WSU-Carbon-Lab/ezfit"
 requires-python = ">=3.10"
-version = "0.2.5"
+version = "0.2.6"
 
 [build-system]
 build-backend = "hatchling.build"
