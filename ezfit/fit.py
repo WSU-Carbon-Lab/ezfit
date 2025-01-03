@@ -258,6 +258,7 @@ class FitAccessor:
 if __name__ == "__main__":
 
     from functions import linear
+    from time import time
 
     test_data = pd.DataFrame(
         {
