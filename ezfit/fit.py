@@ -70,7 +70,6 @@ class Model:
         if self.params is None:
             self.params = {}
         input_params = self.params.copy()
-        print(input_params)
         self.params = {}
         for i, name in enumerate(inspect.signature(self.func).parameters):
             if i == 0:
@@ -80,7 +79,6 @@ class Model:
                 if name not in input_params
                 else Parameter(**input_params[name])
             )
-        print(self.params)
 
     def __call__(self, x) -> tuple[np.ndarray, np.ndarray, np.ndarray] | np.ndarray:
         """Evaluate the model at the given x values."""
