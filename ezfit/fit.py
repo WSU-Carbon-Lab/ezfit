@@ -1,14 +1,13 @@
 """Module for fitting data in a pandas DataFrame to a given model."""
 
+import inspect
 from dataclasses import dataclass
+from typing import Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
-import inspect
-
-from typing import Optional, Dict
 
 
 class ColumnNotFoundError(Exception):
@@ -41,6 +40,9 @@ class Parameter:
             self.min = self.value - np.finfo(float).eps
             self.max = self.value + np.finfo(float).eps
 
+    def __call__(self) -> float:
+        return self.value
+
     def __repr__(self):
         if self.fixed:
             return f"(value={self.value:.10f}, fixed=True)"
@@ -58,6 +60,7 @@ class Model:
 
     func: callable
     params: dict[str:Parameter] | None = None
+    pnames: list[str] | None = None
     residuals: np.ndarray | None = None
     𝜒2: float | None = None
     r𝜒2: float | None = None
@@ -66,25 +69,53 @@ class Model:
         """Generate a list of parameters from the function signature."""
         if self.params is None:
             self.params = {}
-
+        input_params = self.params.copy()
+        print(input_params)
+        self.params = {}
         for i, name in enumerate(inspect.signature(self.func).parameters):
             if i == 0:
                 continue
             self.params[name] = (
                 Parameter()
-                if name not in self.params
-                else Parameter(**self.params[name])
+                if name not in input_params
+                else Parameter(**input_params[name])
             )
+        print(self.params)
 
     def __call__(self, x) -> tuple[np.ndarray, np.ndarray, np.ndarray] | np.ndarray:
         """Evaluate the model at the given x values."""
-        nominal = self.func(x, *[param.value for param in self.params.values()])
+        nominal = self.func(x, **self.kwargs())
         return nominal
 
     def __repr__(self):
         name = self.func.__name__
         params = "\n".join([f"{v} : {param}" for v, param in self.params.items()])
         return f"{name}:\n𝜒2: {self.𝜒2}\nreduced 𝜒2: {self.r𝜒2}\n{params}"
+
+    def __getitem__(self, key) -> Parameter:
+        return self.params[key]
+
+    def __setitem__(self, key, value: tuple[float, float]):
+        self.params[key].value = value[0]
+        self.params[key].err = value[1]
+
+    def __iter__(self) -> tuple[str, Parameter]:
+        yield from [(n, val) for n, val in self.params.items()]
+
+    def values(self) -> list[float]:
+        """Yield the model parameters as a list."""
+        return [param.value for _, param in iter(self)]
+
+    def bounds(self) -> tuple[list[float], list[float]]:
+        """Yield the model parameter bounds as a tuple of lists."""
+        return (
+            [param.min for _, param in iter(self)],
+            [param.max for _, param in iter(self)],
+        )
+
+    def kwargs(self) -> dict:
+        """Return the model parameters as a dictionary."""
+        return {k: v.value for k, v in self.params.items()}
 
     def random(self, x):
         """Returns a valid random value within the bounds."""
@@ -157,11 +188,9 @@ class FitAccessor:
         yerr = self._df[yerr].values if yerr is not None else [1] * len(xdata)
 
         data_model = Model(model, parameters)
-        p0 = [param.value for param in data_model.params.values()]
-        bounds = (
-            [param.min for param in data_model.params.values()],
-            [param.max for param in data_model.params.values()],
-        )
+        p0 = data_model.values()
+        bounds = data_model.bounds()
+        print(p0, bounds)
 
         popt, pcov, infodict, _, _ = curve_fit(
             data_model.func,
@@ -174,9 +203,8 @@ class FitAccessor:
             full_output=True,
         )
 
-        for i, name in enumerate(data_model.params):
-            data_model.params[name].value = popt[i]
-            data_model.params[name].err = np.round(np.sqrt(pcov[i, i]), 4)
+        for i, (name, _) in enumerate(data_model):
+            data_model[name] = popt[i], np.sqrt(pcov[i, i])
 
         data_model.residuals = infodict["fvec"]
         data_model.𝜒2 = np.sum(data_model.residuals**2)
@@ -257,16 +285,28 @@ class FitAccessor:
 
 if __name__ == "__main__":
 
-    from functions import linear
-    from time import time
+    from pathlib import Path
 
-    test_data = pd.DataFrame(
-        {
-            "x": np.linspace(0, 10, 100),
-            "y": np.linspace(0, 10, 100) + np.random.normal(0, 0.75, 100),
-            "y_err": np.sqrt(np.linspace(0, 10, 100)) / 5 + 1,
-        }
+    from functions import linear, pseudo_voigt
+
+    def peak(x, height, center, fwhm, eta, m, b):
+        return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
+
+    df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
+    df["logI"] = np.log(df["intensity"])
+    # propogate uncertianty to the intU col
+    # δlog(I) = δI / I
+    df["logintU"] = df["intU"] / df["intensity"]
+    pk1 = df.query("0.3 < qVal < 0.45")
+
+    model, ax = pk1.fit(
+        peak,
+        "qVal",
+        "logI",
+        "logintU",
+        center={"value": 0.37, "min": 0.35, "max": 0.38},
+        fwhm={"value": 0.11, "min": 0, "max": 0.2},
+        m={"value": -3, "max": 0},
+        eta={"value": 1, "min": 0, "max": 1},
     )
-    model, ax = test_data.fit(linear, "x", "y", "y_err")
     print(model)
-    plt.show()
