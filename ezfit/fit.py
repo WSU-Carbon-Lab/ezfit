@@ -162,7 +162,6 @@ class FitAccessor:
             [param.min for param in data_model.params.values()],
             [param.max for param in data_model.params.values()],
         )
-        print(data_model)
 
         popt, pcov, infodict, _, _ = curve_fit(
             data_model.func,
@@ -244,6 +243,10 @@ class FitAccessor:
         nominal = model(xdata)
 
         ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
+        #  add residuals plotted on new axis below
+        ax_res = ax.inset_axes([0, -0.2, 1, 0.2])
+        ax_res.plot(xdata, model.residuals, linestyle="", marker=".", color="C2")
+        ax_res.axhline(0, color="grey", linewidth=plt.rcParams["lines.linewidth"])
 
         # Labels and legend
         ax.set_xlabel(x)

@@ -1,6 +1,7 @@
 import numpy as np
 import numba as nb
 from inspect import signature
+from warnings import deprecated
 
 
 @nb.njit(cache=True, fastmath=True)
@@ -36,6 +37,8 @@ def linear(x, m, b):
     return m * x + b
 
 
+# not implemented yet
+@deprecated
 @nb.jit(cache=True, fastmath=True)
 def peak(peak_function, bg_function):
     peak_signature = signature(peak_function)
