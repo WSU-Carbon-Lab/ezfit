@@ -16,6 +16,21 @@ class ColumnNotFoundError(Exception):
         self.message = f"Column '{column}' not found in DataFrame."
 
 
+def sig_fig_round(x, n):
+    """Round a number to n significant figures."""
+    if x == 0:
+        return 0
+    return round(x, -int(np.floor(np.log10(abs(x))) - (n - 1)))
+
+
+def rounded_values(x, xerr, n):
+    """Round the values and errors to n significant figures."""
+    err = sig_fig_round(xerr, n)
+    # Round the value to the same number of decimal places as the error
+    val = round(x, -int(np.floor(np.log10(err))))
+    return val, err
+
+
 @dataclass
 class Parameter:
     """Data class for a parameter and its bounds."""
@@ -46,7 +61,7 @@ class Parameter:
     def __repr__(self):
         if self.fixed:
             return f"(value={self.value:.10f}, fixed=True)"
-        return f"(value={self.value} ± {self.err}, bounds=({self.min}, {self.max}))"
+        return f"(value = {self.value} ± {self.err}, bounds = ({self.min}, {self.max}))"
 
     def random(self) -> float:
         """Returns a valid random value within the bounds."""
@@ -60,8 +75,9 @@ class Model:
 
     func: callable
     params: dict[str:Parameter] | None = None
-    pnames: list[str] | None = None
     residuals: np.ndarray | None = None
+    cov: np.ndarray | None = None
+    cor: np.ndarray | None = None
     𝜒2: float | None = None
     r𝜒2: float | None = None
 
@@ -87,8 +103,23 @@ class Model:
 
     def __repr__(self):
         name = self.func.__name__
+        chi = f"𝜒2: {self.𝜒2}" if self.𝜒2 is not None else "𝜒2: None"
+        rchi = f"reduced 𝜒2: {self.r𝜒2}" if self.r𝜒2 is not None else "reduced 𝜒2: None"
         params = "\n".join([f"{v} : {param}" for v, param in self.params.items()])
-        return f"{name}:\n𝜒2: {self.𝜒2}\nreduced 𝜒2: {self.r𝜒2}\n{params}"
+        with np.printoptions(suppress=True, precision=4):
+            _cov = (
+                self.cov
+                if self.cov is not None
+                else np.zeros((len(self.params), len(self.params)))
+            )
+            _cor = (
+                self.cor
+                if self.cor is not None
+                else np.zeros((len(self.params), len(self.params)))
+            )
+            cov = f"covariance:\n{_cov.__str__()}"
+            cor = f"correlation:\n{_cor.__str__()}"
+        return f"{name}\n{params}\n{chi}\n{rchi}\n{cov}\n{cor}"
 
     def __getitem__(self, key) -> Parameter:
         return self.params[key]
@@ -200,12 +231,14 @@ class FitAccessor:
         )
 
         for i, (name, _) in enumerate(data_model):
-            data_model[name] = popt[i], np.sqrt(pcov[i, i])
+            data_model[name] = rounded_values(popt[i], np.sqrt(pcov[i, i]), 2)
 
         data_model.residuals = infodict["fvec"]
         data_model.𝜒2 = np.sum(data_model.residuals**2)
         dof = len(xdata) - len(popt)
         data_model.r𝜒2 = data_model.𝜒2 / dof
+        data_model.cov = pcov
+        data_model.cor = np.corrcoef(pcov)
 
         return data_model
 
@@ -279,28 +312,28 @@ class FitAccessor:
         return ax
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-# from pathlib import Path
+    from pathlib import Path
 
-# from functions import linear, pseudo_voigt
+    from functions import linear, pseudo_voigt
 
-# def peak(x, height, center, fwhm, eta, m, b):
-#     return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
+    def peak(x, height, center, fwhm, eta, m, b):
+        return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
 
-# df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
-# pk1 = df.query("0.3 < qVal < 0.45")
+    df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
+    pk1 = df.query("0.3 < qVal < 0.45")
 
-# model, ax = pk1.fit(
-#     peak,
-#     "qVal",
-#     "intensity",
-#     "intU",
-#     height={"value": 100000, "min": 0},
-#     center={"value": 0.39},
-#     fwhm={"value": 0.02, "max": 0.1},
-#     m={"value": -3, "max": 0},
-#     eta={"value": 1, "min": 0, "max": 1},
-# )
-# print(model)
-# plt.show()
+    model, ax = pk1.fit(
+        peak,
+        "qVal",
+        "intensity",
+        "intU",
+        height={"value": 100000, "min": 0},
+        center={"value": 0.39},
+        fwhm={"value": 0.02, "max": 0.1},
+        m={"value": -3, "max": 0},
+        eta={"value": 1, "min": 0, "max": 1},
+    )
+    print(model)
+    plt.show()
