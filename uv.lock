@@ -81,7 +81,7 @@ wheels = [
 
 [[package]]
 name = "ezfit"
-version = "0.2.7"
+version = "0.2.8"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -95,9 +95,9 @@ dependencies = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "numba", specifier = ">=0.60.0" },
-    { name = "numpy", specifier = ">=1.23.5,<2.0.0" },
-    { name = "pandas", specifier = ">=2.0,<2.2.3.dev0" },
-    { name = "scipy", specifier = ">=1.7.0,<1.14.0" },
+    { name = "numpy", specifier = ">=1.26.0,<2.0.0" },
+    { name = "pandas", specifier = ">=2.2.2" },
+    { name = "scipy", specifier = ">=1.13.0" },
 ]
 
 [[package]]
