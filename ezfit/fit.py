@@ -2,7 +2,7 @@
 
 import inspect
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Generator, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -128,7 +128,7 @@ class Model:
         self.params[key].value = value[0]
         self.params[key].err = value[1]
 
-    def __iter__(self) -> tuple[str, Parameter]:
+    def __iter__(self) -> Generator[Any, Any, Any]:
         yield from [(n, val) for n, val in self.params.items()]
 
     def values(self) -> list[float]:
@@ -302,9 +302,12 @@ class FitAccessor:
         ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
         #  add residuals plotted on new axis below
         ax_res = ax.inset_axes([0, -0.2, 1, 0.2])
-        ax_res.plot(xdata, model.residuals, linestyle="", marker=".", color="C2")
-        ax_res.axhline(0, color="grey", linewidth=plt.rcParams["lines.linewidth"])
-
+        s = pd.Series(model.residuals)
+        ax_res = pd.plotting.autocorrelation_plot(s, ax=ax_res, color="C2")
+        ax_res.set_xlabel(x)
+        ax_res.set_ylabel("Residuals")
+        ax_res.grid(False)
+        ax_res.get_figure().tight_layout()
         # Labels and legend
         ax.set_xlabel(x)
         ax.set_ylabel(y)
