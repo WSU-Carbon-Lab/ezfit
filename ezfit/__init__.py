@@ -1,12 +1,14 @@
 from ezfit.fit import FitAccessor, Model, Parameter
 from ezfit.functions import (
-    power_law,
     exponential,
     gaussian,
-    lorentzian,
-    pseudo_voigt,
     linear,
+    lorentzian,
+    power_law,
+    pseudo_voigt,
 )
+
+__version__ = "0.2.9"
 
 __all__ = [
     "Parameter",
