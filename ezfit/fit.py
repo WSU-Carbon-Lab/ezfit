@@ -272,6 +272,9 @@ class FitAccessor:
         matplotlib.axes.Axes
             The axis with the plot.
         """
+        import warnings
+
+        warnings.filterwarnings("ignore")
         if data_kwargs is None:
             data_kwargs = {}
         if model_kwargs is None:
@@ -304,7 +307,8 @@ class FitAccessor:
         ax_res = ax.inset_axes([0, -0.3, 1, 0.2])
         s = pd.Series(model.residuals)
         ax_res = pd.plotting.autocorrelation_plot(s, ax=ax_res, color="C2")
-        ax_res.set_xticklabels(ax.get_xticklabels())
+        ticks = ax.get_xticks()
+        ax_res.set_xticklabels(ticks)
         ax_res.set_xlabel(x)
         ax_res.set_ylabel("Residuals")
         ax_res.grid(False)

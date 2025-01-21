@@ -8,7 +8,7 @@ from ezfit.functions import (
     pseudo_voigt,
 )
 
-__version__ = "0.2.10"
+__version__ = "0.2.11"
 
 __all__ = [
     "Parameter",
