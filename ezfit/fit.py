@@ -238,7 +238,7 @@ class FitAccessor:
         dof = len(xdata) - len(popt)
         data_model.r𝜒2 = data_model.𝜒2 / dof
         data_model.cov = pcov
-        data_model.cor = np.corrcoef(pcov)
+        data_model.cor = pcov / np.outer(np.sqrt(np.diag(pcov)), np.sqrt(np.diag(pcov)))
 
         return data_model
 
@@ -301,6 +301,7 @@ class FitAccessor:
 
         ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
         #  add residuals plotted on new axis below
+        ax.tick_params(axis="x", which="both", bottom=False, top=False)
         ax_res = ax.inset_axes([0, -0.2, 1, 0.2])
         s = pd.Series(model.residuals)
         ax_res = pd.plotting.autocorrelation_plot(s, ax=ax_res, color="C2")
