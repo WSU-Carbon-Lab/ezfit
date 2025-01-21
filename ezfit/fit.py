@@ -301,16 +301,19 @@ class FitAccessor:
 
         ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
         #  add residuals plotted on new axis below
-        ax.tick_params(axis="x", which="both", bottom=False, top=False)
-        ax_res = ax.inset_axes([0, -0.2, 1, 0.2])
+        ax_res = ax.inset_axes([0, -0.3, 1, 0.2])
         s = pd.Series(model.residuals)
         ax_res = pd.plotting.autocorrelation_plot(s, ax=ax_res, color="C2")
+        ax_res.set_xticklabels(ax.get_xticklabels())
         ax_res.set_xlabel(x)
         ax_res.set_ylabel("Residuals")
         ax_res.grid(False)
         ax_res.get_figure().tight_layout()
+        ax_res.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
         # Labels and legend
-        ax.set_xlabel(x)
+        ax_res.set_xlabel(x)
+        ax.set_xticklabels([])
+        ax.set_xticks([])
         ax.set_ylabel(y)
         ax.legend()
         return ax
