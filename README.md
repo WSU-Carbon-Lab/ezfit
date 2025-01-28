@@ -1,3 +1,8 @@
+
+
+[![DOI](https://zenodo.org/badge/902649899.svg)](https://doi.org/10.5281/zenodo.14758697)
+
+
 # EZFIT A Dead simple interface for fitting in python
 
 This package is built for use by people who are new not just to python but to coding,
