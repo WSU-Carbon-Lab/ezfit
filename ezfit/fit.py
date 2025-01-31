@@ -61,7 +61,8 @@ class Parameter:
     def __repr__(self):
         if self.fixed:
             return f"(value={self.value:.10f}, fixed=True)"
-        return f"(value = {self.value} ± {self.err}, bounds = ({self.min}, {self.max}))"
+        v, e = rounded_values(self.value, self.err, 2)
+        return f"(value = {v} ± {e}, bounds = ({self.min}, {self.max}))"
 
     def random(self) -> float:
         """Returns a valid random value within the bounds."""
@@ -233,7 +234,7 @@ class FitAccessor:
         )
 
         for i, (name, _) in enumerate(data_model):
-            data_model[name] = rounded_values(popt[i], np.sqrt(pcov[i, i]), 2)
+            data_model[name] = popt[i], np.sqrt(pcov[i, i])
 
         data_model.residuals = infodict["fvec"]
         data_model.𝜒2 = np.sum(data_model.residuals**2)
@@ -323,9 +324,7 @@ class FitAccessor:
         ax_res.axhline(
             np.percentile(percent_diff, 0.4), color="grey", linestyle=":", alpha=0.5
         )
-        ax_res.set_ylim(
-            np.percentile(percent_diff, 0.4) - 5, np.percentile(percent_diff, 99.6) + 5
-        )
+
         ax.set_xlim(min(xdata), max(xdata))
         ax_res.set_xlim(min(xdata), max(xdata))
 
