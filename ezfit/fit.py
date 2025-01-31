@@ -168,13 +168,13 @@ class FitAccessor:
         plot: bool = True,
         plot_kwargs: dict = {"data_kwargs": {}, "model_kwargs": {}},
         **parameters: dict[str, Parameter],
-    ) -> Model | tuple[Model, plt.Axes | None]:
+    ) -> tuple[Model, plt.Axes | None, plt.Axes | None]:
         model = self.fit(model, x, y, yerr, **parameters)
         if plot:
             ax = plt.gca()
-            self.plot(x, y, model, yerr, ax, **plot_kwargs)
-            return model, ax
-        return model, None
+            ax, ax_res = self.plot(x, y, model, yerr, ax, **plot_kwargs)
+            return model, ax, ax_res
+        return model
 
     def fit(
         self,
@@ -213,7 +213,9 @@ class FitAccessor:
 
         xdata = self._df[x].values
         ydata = self._df[y].values
-        yerr = self._df[yerr].values if yerr is not None else [1] * len(xdata)
+        yerr = (
+            self._df[yerr].values if yerr is not None else None
+        )  # 0.01 * np.ones_like(ydata)
 
         data_model = Model(model, parameters)
         p0 = data_model.values()
@@ -226,7 +228,7 @@ class FitAccessor:
             p0=p0,
             sigma=yerr,
             bounds=bounds,
-            absolute_sigma=True,
+            absolute_sigma=True if yerr is not None else False,
             full_output=True,
         )
 
@@ -305,46 +307,58 @@ class FitAccessor:
         ax.plot(xdata, nominal, color="C1", label="Model", **model_kwargs)
         #  add residuals plotted on new axis below
         ax_res = ax.inset_axes([0, -0.3, 1, 0.2])
-        s = pd.Series(model.residuals)
-        ax_res = pd.plotting.autocorrelation_plot(s, ax=ax_res, color="C2")
-        ticks = ax.get_xticks()
-        ax_res.set_xticklabels(ticks)
+        percent_diff = 100 * model.residuals / self._df[y].values
+        # add quantiles to residuals plot
+
+        ax_res.axhline(0, color="grey")
+        ax_res.axhline(
+            np.percentile(percent_diff, 95), color="grey", linestyle="--", alpha=0.5
+        )
+        ax_res.axhline(
+            np.percentile(percent_diff, 99.6), color="grey", linestyle=":", alpha=0.5
+        )
+        ax_res.axhline(
+            np.percentile(percent_diff, 5), color="grey", linestyle="--", alpha=0.5
+        )
+        ax_res.axhline(
+            np.percentile(percent_diff, 0.4), color="grey", linestyle=":", alpha=0.5
+        )
+        ax_res.set_ylim(
+            np.percentile(percent_diff, 0.4) - 5, np.percentile(percent_diff, 99.6) + 5
+        )
+        ax.set_xlim(min(xdata), max(xdata))
+        ax_res.set_xlim(min(xdata), max(xdata))
+
+        ax_res.plot(xdata, percent_diff, ":", color="C0")
         ax_res.set_xlabel(x)
-        ax_res.set_ylabel("Residuals")
-        ax_res.grid(False)
+        ax_res.set_ylabel(r"% difference")
         ax_res.get_figure().tight_layout()
-        ax_res.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
         # Labels and legend
         ax_res.set_xlabel(x)
         ax.set_xticklabels([])
         ax.set_xticks([])
         ax.set_ylabel(y)
         ax.legend()
-        return ax
+        return ax, ax_res
 
 
 if __name__ == "__main__":
+    from functions import linear
 
-    from pathlib import Path
-
-    from functions import linear, pseudo_voigt
-
-    def peak(x, height, center, fwhm, eta, m, b):
-        return pseudo_voigt(x, height, center, fwhm, eta) + linear(x, m, b)
-
-    df = pd.read_csv(Path().cwd() / "HW5data.txt", sep=r"\s+")
-    pk1 = df.query("0.3 < qVal < 0.45")
-
-    model, ax = pk1.fit(
-        peak,
-        "qVal",
-        "intensity",
-        "intU",
-        height={"value": 100000, "min": 0},
-        center={"value": 0.39},
-        fwhm={"value": 0.02, "max": 0.1},
-        m={"value": -3, "max": 0},
-        eta={"value": 1, "min": 0, "max": 1},
+    df = pd.DataFrame(
+        {
+            "q": np.linspace(2e-5, 1e-3, 10),
+            "int": np.linspace(9.8, 9.4, 10) + np.random.normal(0, 0.01, 10),
+        }
     )
+
+    model, ax, ax_res = df.query("0 < `q` < 10").fit(
+        linear,
+        "q",
+        "int",
+        m={"value": -400, "max": -300, "min": -500},
+    )
+    ax.set_title("Linear fit")
+    ax_res.set_title("Residuals")
     print(model)
     plt.show()
