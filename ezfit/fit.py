@@ -588,6 +588,7 @@ if __name__ == "__main__":
         {
             "q": np.linspace(2e-5, 1e-3, 1000),
             "int": np.linspace(9.8, 9.4, 1000) + np.random.normal(0, 0.001, 1000),
+            "int_err": 0.01 * np.ones(1000),
         }
     )
 
@@ -595,9 +596,19 @@ if __name__ == "__main__":
         linear,
         "q",
         "int",
+        "int_err",
+        color_error="C2",
         m={"value": -400, "max": -300, "min": -500},
+        err_kws={
+            "fmt": "o",
+            "ms": 1,
+            "capsize": 2,
+            "ecolor": "black",
+            "errorevery": 10,
+        },
     )
     ax.set_title("Linear fit")
     ax_res.set_title("Residuals")
+    ax.figure.set_size_inches(12, 6)
     print(model)
     plt.show()
