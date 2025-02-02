@@ -1,6 +1,6 @@
 # Functions
 
-[Ezfit Index](../README.md#ezfit-index) / [Ezfit](./index.md#ezfit) / Functions
+[Ezfit Index](../README.md#ezfit-index) / [EZFIT A Dead simple interface for fitting in python](./index.md#ezfit-a-dead-simple-interface-for-fitting-in-python) / Functions
 
 > Auto-generated documentation for [ezfit.functions](../../ezfit/functions.py) module.
 
