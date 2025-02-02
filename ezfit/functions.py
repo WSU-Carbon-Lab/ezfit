@@ -1,3 +1,7 @@
+"""
+Numba-optimized functions for fitting.
+"""
+
 import math
 
 import numpy as np
@@ -6,6 +10,9 @@ from numba import njit, prange
 
 @njit(parallel=True, fastmath=True)
 def power_law(x, a, b):
+    """
+    Power law function: y = a * x^b
+    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):
@@ -15,6 +22,9 @@ def power_law(x, a, b):
 
 @njit(parallel=True, fastmath=True)
 def exponential(x, a, b):
+    """
+    Exponential function: y = a * exp(b * x)
+    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):
@@ -91,6 +101,9 @@ def pseudo_voigt(x, height, center, fwhm, eta):
 
 @njit(parallel=True, fastmath=True)
 def linear(x, m, b):
+    """
+    Linear function: y = m*x + b
+    """
     n = x.size
     out = np.empty(n, dtype=np.float64)
     for i in prange(n):

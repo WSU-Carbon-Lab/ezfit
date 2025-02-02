@@ -6,6 +6,7 @@ dependencies = [
   "scipy>=1.13.0",
   "matplotlib>=3.10.0",
   "numba>=0.60.0",
+  "sphinx>=8.1.3",
 ]
 description = "Fitting in python made easy"
 dynamic = ["version"]
@@ -21,3 +22,11 @@ requires = ["hatchling"]
 
 [tool.hatch.version]
 path = "ezfit/__init__.py"
+
+[tool.commitizen]
+major_version_zero = true
+name = "cz_conventional_commits"
+tag_format = "v$version"
+update_changelog_on_bump = true
+version_provider = "pep621"
+version_scheme = "pep440"
