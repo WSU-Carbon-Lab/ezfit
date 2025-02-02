@@ -1,3 +1,9 @@
+## v0.5.0 (2025-02-01)
+
+### Fix
+
+- removed pesky notebooks
+
 ## v0.4.0 (2025-02-01)
 
 ### Feat
