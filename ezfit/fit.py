@@ -61,6 +61,7 @@ class FitAccessor:
         err_kws: dict = {},
         mod_kws: dict = {},
         res_kws: dict = {},
+        range: tuple[float,float]| None = None,
         **parameters: dict[str, Parameter],
     ) -> tuple[Model, plt.Axes | None, plt.Axes | None]:
         """
@@ -107,6 +108,9 @@ class FitAccessor:
                 Additional keyword arguments for model line plotting.
             res_kws (dict, optional):
                 Additional keyword arguments for residuals plotting.
+            range (float, float):
+                Additional tuple to specify the fit range (will be given to `query`)
+                (xmin, xmax)
             parameters (dict[str, Parameter]):
                 Specification of the model parameters, their initial values, and bounds.
 
