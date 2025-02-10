@@ -334,9 +334,9 @@ class FitAccessor:
         err_kws = {
             "color": color_error,
             "fmt": fmt_error,
-            "ms": 4,
+            "ms": 8,
             "zorder": 0,
-            "alpha": 0.5,
+            "alpha": 1,
             **err_kws,
         }
         mod_kws = {"c": color_model, "ls": ls_model, "zorder": 1, **mod_kws}
