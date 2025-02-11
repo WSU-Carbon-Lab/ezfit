@@ -1,7 +1,8 @@
 """DataFrame accessor for fitting data stored in a DataFrame."""
 
 import warnings
-from typing import Literal
+from collections.abc import Callable
+from typing import Literal, TypedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +11,15 @@ from scipy.optimize import curve_fit
 
 from ezfit.exceptions import ColumnNotFoundError
 from ezfit.model import Model, Parameter
-from ezfit.types import FitKwargs
+
+
+class FitKwargs(TypedDict):
+    """Type hint for the keyword arguments of the `fit` method."""
+
+    check_finite: bool
+    method: Literal["lm", "trf", "dogbox"]
+    jac: Callable | str | None
+    nan_policy: Literal["raise", "omit"] | None
 
 
 @pd.api.extensions.register_dataframe_accessor("fit")
@@ -20,12 +29,13 @@ class FitAccessor:
 
     Usage:
     ```python
-
-    df = pd.DataFrame({
-        "x": np.linspace(0, 10, 100),
-        "y": np.linspace(0, 10, 100) + np.random.normal(0, 1, 100),
-        "yerr": 0.1 * np.ones(100)
-    })
+    df = pd.DataFrame(
+        {
+            "x": np.linspace(0, 10, 100),
+            "y": np.linspace(0, 10, 100) + np.random.normal(0, 1, 100),
+            "yerr": 0.1 * np.ones(100),
+        }
+    )
 
     model, ax, ax_res = df.fit(
         model=ezfit.linear,
@@ -46,7 +56,7 @@ class FitAccessor:
         model: callable,
         x: str,
         y: str,
-        yerr: str = None,
+        yerr: str | None = None,
         *,
         plot: bool = True,
         fit_kwargs: FitKwargs = None,
@@ -58,10 +68,10 @@ class FitAccessor:
         ls_model: str = "-",
         ls_residuals: str = "",
         marker_residuals: str = ".",
-        err_kws: dict = {},
-        mod_kws: dict = {},
-        res_kws: dict = {},
-        range: tuple[float,float]| None = None,
+        err_kws: dict | None = None,
+        mod_kws: dict | None = None,
+        res_kws: dict | None = None,
+        range: tuple[float, float] | None = None,
         **parameters: dict[str, Parameter],
     ) -> tuple[Model, plt.Axes | None, plt.Axes | None]:
         """
@@ -71,6 +81,7 @@ class FitAccessor:
         and plotting the results.
 
         Args:
+        -----
             model (callable):
                 The model function to fit the data to.
             x (str):
@@ -108,18 +119,20 @@ class FitAccessor:
                 Additional keyword arguments for model line plotting.
             res_kws (dict, optional):
                 Additional keyword arguments for residuals plotting.
-            range (float, float):
-                Additional tuple to specify the fit range (will be given to `query`)
-                (xmin, xmax)
+            range (tuple[float, float], optional):
+                Additional tuple to specify the fit range interpreted as
+                (min, max) of the x-axis.
             parameters (dict[str, Parameter]):
                 Specification of the model parameters, their initial values, and bounds.
 
-        Returns:
+        Returns
+        -------
             tuple[Model, plt.Axes | None, plt.Axes | None]:
                 The fitted model and the axes objects for the main plot and residuals
                 plot.
 
-        Raises:
+        Raises
+        ------
             ColumnNotFoundError:
                 If the specified column is not found in the DataFrame.
         """
@@ -154,6 +167,7 @@ class FitAccessor:
         y: str,
         yerr: str | None = None,
         *,
+        range: tuple[float, float] | None = None,
         fit_kwargs: FitKwargs = None,
         **parameters: dict[str, Parameter],
     ):
@@ -177,11 +191,13 @@ class FitAccessor:
             parameters (dict[str, Parameter]):
                 Specification of the model parameters, their initial values, and bounds.
 
-        Returns:
+        Returns
+        -------
             Model:
                 The fitted model.
 
-        Raises:
+        Raises
+        ------
             ColumnNotFoundError:
                 If the specified column is not found in the DataFrame.
         """
@@ -212,7 +228,7 @@ class FitAccessor:
             p0=p0,
             sigma=yerr,
             bounds=bounds,
-            absolute_sigma=True if yerr is not None else False,
+            absolute_sigma=yerr is not None,
             full_output=True,
             **fit_kwargs,
         )
@@ -234,7 +250,7 @@ class FitAccessor:
         x: str,
         y: str,
         model: Model,
-        yerr: str = None,
+        yerr: str | None = None,
         *,
         ax: plt.Axes = None,
         residuals: Literal["none", "res", "percent", "rmse"] = "res",
@@ -245,9 +261,9 @@ class FitAccessor:
         ls_model: str = "-",
         ls_residuals: str = "",
         marker_residuals: str = ".",
-        err_kws: dict = {},
-        mod_kws: dict = {},
-        res_kws: dict = {},
+        err_kws: dict | None = None,
+        mod_kws: dict | None = None,
+        res_kws: dict | None = None,
     ) -> plt.Axes | tuple[plt.Axes, plt.Axes]:
         """
         Plot the data, model, and residuals.
@@ -305,17 +321,18 @@ class FitAccessor:
             parameters (dict[str, Parameter]):
                 Specification of the model parameters, their initial values, and bounds.
 
-        Returns:
+        Returns
+        -------
             plt.Axes | tuple[plt.Axes, plt.Axes]:
             The axes object for the main plot and residuals plot if `residuals` is not
             "none".
 
-        Raises:
+        Raises
+        ------
             ColumnNotFoundError:
             If the specified column is not found in the DataFrame. ValueError: If an
             invalid residuals metric is specified.
         """
-
         warnings.filterwarnings("ignore")
 
         if ax is None:
@@ -334,6 +351,10 @@ class FitAccessor:
         ydata = self._df[y].values
         yerr_values = self._df[yerr].values if yerr is not None else None
         nominal = model(xdata)
+
+        err_kws = {} if err_kws is None else err_kws
+        mod_kws = {} if mod_kws is None else mod_kws
+        res_kws = {} if res_kws is None else res_kws
 
         err_kws = {
             "color": color_error,
@@ -395,7 +416,8 @@ class FitAccessor:
                     np.percentile(err_metric, 99.6),
                 ]
             case _:
-                raise ValueError("Invalid residuals metric")
+                e = "Invalid residuals metric"
+                raise ValueError(e)
         ls = ["-", "--", ":", "--", ":"]
         for i, line in enumerate(lines):
             ax_res.axhline(line, color="grey", linestyle=ls[i], alpha=0.5)

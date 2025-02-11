@@ -11,7 +11,7 @@ from numba import njit, prange
 @njit(parallel=True, fastmath=True)
 def power_law(x, a, b):
     """
-    Power law function: y = a * x^b
+    Power law function: y = a * x^b.
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
@@ -23,7 +23,7 @@ def power_law(x, a, b):
 @njit(parallel=True, fastmath=True)
 def exponential(x, a, b):
     """
-    Exponential function: y = a * exp(b * x)
+    Exponential function: y = a * exp(b * x).
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
@@ -75,6 +75,8 @@ def lorentzian(x, amplitude, center, fwhm):
 @njit(parallel=True, fastmath=True)
 def pseudo_voigt(x, height, center, fwhm, eta):
     """
+    Pseudo-Voigt function with peak = 'height' and FWHM = 'fwhm'.
+
     Pseudo-Voigt model (peak-based):
         y = height * [ (1 - eta)*G + eta*L ]
 
@@ -102,7 +104,7 @@ def pseudo_voigt(x, height, center, fwhm, eta):
 @njit(parallel=True, fastmath=True)
 def linear(x, m, b):
     """
-    Linear function: y = m*x + b
+    Linear function: y = m*x + b.
     """
     n = x.size
     out = np.empty(n, dtype=np.float64)
