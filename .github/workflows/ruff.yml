@@ -14,17 +14,19 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Ruff Format
+      uses: chartboost/ruff-action@v1
+      with:
+         args: "format ./pyproject.toml"
 
     - name: Install uv
       uses: astral-sh/setup-uv@v5
-      with:
-        pyproject-file: "pyproject.toml"
-        enable-cache: true
-        cache-dependency-glob: "uv.lock"
 
     - name: Install the project
-      run: uv sync --all-extras --dev
+      run: uv sync --all-extras --python=3.10
 
+    - name: UV Build
+      run: uv build --all-extras --python=3.10
 
 
   publish:
