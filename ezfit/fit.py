@@ -136,6 +136,17 @@ class FitAccessor:
             ColumnNotFoundError:
                 If the specified column is not found in the DataFrame.
         """
+        if range is not None:
+            # TODO @WSUcollins: Implement proper range filtering
+            # https://github.com/WSU-Carbon-Lab/ezfit/issues/1
+            warnings.warn(
+                """
+                DATA LOSS WARNING. Range is experimental and will modify the DataFrame.
+                """,
+                stacklevel=1,
+            )
+            self._df = self._df.query(f"{range[0]} < {x} < {range[1]}")
+
         model = self.fit(model, x, y, yerr, fit_kwargs=fit_kwargs, **parameters)
         if plot:
             ax = plt.gca()
@@ -167,7 +178,7 @@ class FitAccessor:
         y: str,
         yerr: str | None = None,
         *,
-        range: tuple[float, float] | None = None,
+        # range: tuple[float, float] | None = None,
         fit_kwargs: FitKwargs = None,
         **parameters: dict[str, Parameter],
     ):
