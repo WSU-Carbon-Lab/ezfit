@@ -26,7 +26,7 @@ jobs:
       run: uv sync --all-extras --python=3.10
 
     - name: UV Build
-      run: uv build --all-extras --python=3.10
+      run: uv build --python=3.10
 
 
   publish:
