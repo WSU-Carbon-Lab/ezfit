@@ -2,6 +2,10 @@ name: Python Chores
 
 on: [push, pull_request]
 
+permissions:
+ contents: read
+ id-token: write
+
 jobs:
   lint-and-check:
     name: Build (${{ matrix.os }})
