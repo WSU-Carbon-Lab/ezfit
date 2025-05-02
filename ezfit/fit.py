@@ -1,65 +1,54 @@
-"""DataFrame accessor for fitting data stored in a DataFrame."""
+"""Fit module for ezfit."""
 
 import warnings
 from collections.abc import Callable
-from typing import Literal, TypedDict
+from typing import Any, Literal, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
+from matplotlib.axes import Axes
 
 from ezfit.exceptions import ColumnNotFoundError
-from ezfit.model import Model, Parameter
-
-
-class FitKwargs(TypedDict):
-    """Type hint for the keyword arguments of the `fit` method."""
-
-    check_finite: bool
-    method: Literal["lm", "trf", "dogbox"]
-    jac: Callable | str | None
-    nan_policy: Literal["raise", "omit"] | None
+from ezfit.model import Model
+from ezfit.optimizers import (  # Import optimizer functions
+    _fit_bayesian_ridge,
+    _fit_curve_fit,
+    _fit_differential_evolution,
+    _fit_dual_annealing,
+    _fit_emcee,
+    _fit_minimize,
+    _fit_shgo,
+)
+from ezfit.types import (  # Import specific Kwargs types
+    BayesianRidgeKwargs,  # Keep FitKwargs for type hinting
+    CurveFitKwargs,
+    DifferentialEvolutionKwargs,
+    DualAnnealingKwargs,
+    EmceeKwargs,
+    FitKwargs,
+    FitMethod,
+    MinimizeKwargs,
+    ShgoKwargs,
+)
 
 
 @pd.api.extensions.register_dataframe_accessor("fit")
 class FitAccessor:
-    """
-    Accessor for fitting data in a pandas DataFrame to a given model.
+    """Accessor for fitting data in a pandas DataFrame to a given model."""
 
-    Usage:
-    ```python
-    df = pd.DataFrame(
-        {
-            "x": np.linspace(0, 10, 100),
-            "y": np.linspace(0, 10, 100) + np.random.normal(0, 1, 100),
-            "yerr": 0.1 * np.ones(100),
-        }
-    )
-
-    model, ax, ax_res = df.fit(
-        model=ezfit.linear,
-        x="x",
-        y="y",
-        yerr="yerr",
-        m={"value": 1, "min": 0, "max": 2},
-        b={"value": 0, "min": -1, "max": 1},
-    )
-    ```
-    """
-
-    def __init__(self, df):
+    def __init__(self, df: pd.DataFrame) -> None:
         self._df = df
 
     def __call__(
         self,
-        model: callable,
+        model: Callable[..., Any],
         x: str,
         y: str,
         yerr: str | None = None,
-        *,
         plot: bool = True,
-        fit_kwargs: FitKwargs = None,
+        method: FitMethod = "curve_fit",
+        fit_kwargs: FitKwargs | None = None,
         residuals: Literal["none", "res", "percent", "rmse"] = "res",
         color_error: str = "C0",
         color_model: str = "C3",
@@ -68,94 +57,84 @@ class FitAccessor:
         ls_model: str = "-",
         ls_residuals: str = "",
         marker_residuals: str = ".",
-        err_kws: dict | None = None,
-        mod_kws: dict | None = None,
-        res_kws: dict | None = None,
-        range: tuple[float, float] | None = None,
-        **parameters: dict[str, Parameter],
-    ) -> tuple[Model, plt.Axes | None, plt.Axes | None]:
-        """
-        Fit the data to the model and plot the results.
+        err_kws: dict[str, Any] | None = None,
+        mod_kws: dict[str, Any] | None = None,
+        res_kws: dict[str, Any] | None = None,
+        **parameters: dict[str, Any],
+    ) -> tuple[Model, Axes | None, Axes | None]:
+        """Fit the data to the model and optionally plot the results.
 
-        Calls the `fit` and `plot` methods in sequence fitting the data to the model
-        and plotting the results.
+        Calls the [FitAccessor.fit](#fitaccessorfit) and
+        [FitAccessor.plot](#fitaccessorplot) methods in sequence.
 
         Args:
-        -----
-            model (callable):
-                The model function to fit the data to.
-            x (str):
-                The name of the column in the DataFrame to use as the independent
-                variable.
-            y (str):
-                The name of the column in the DataFrame to use as the dependent
-                variable.
-            yerr (str, optional):
-                The name of the column in the DataFrame to use as the
-                error on the dependent variable.
-            plot (bool, optional):
-                Whether to plot the results.
-                fit_kwargs (FitKwargs, optional): Keyword arguments to pass to
-                `scipy.optimize.curve_fit`.
-            residuals (Literal["none", "res", "percent", "rmse"], optional):
-                The type of residuals to plot.
-            color_error (str, optional):
-                The color of the error bars.
-            color_model (str, optional):
-                The color of the model line.
-            color_residuals (str, optional):
-                The color of the residuals.
-            fmt_error (str, optional):
-                The marker style for the error bars.
-            ls_model (str, optional):
-                The line style for the model line.
-            ls_residuals (str, optional):
-                The line style for the residuals.
-            marker_residuals (str, optional):
-                The marker style for the residuals.
-            err_kws (dict, optional):
-                Additional keyword arguments for errorbar plotting.
-            mod_kws (dict, optional):
-                Additional keyword arguments for model line plotting.
-            res_kws (dict, optional):
-                Additional keyword arguments for residuals plotting.
-            range (tuple[float, float], optional):
-                Additional tuple to specify the fit range interpreted as
-                (min, max) of the x-axis.
-            parameters (dict[str, Parameter]):
-                Specification of the model parameters, their initial values, and bounds.
+            model: The model function to fit the data to.
+            x: The name of the column in the DataFrame for the independent variable.
+            y: The name of the column in the DataFrame for the dependent variable.
+            yerr: The name of the column for the error on the dependent variable.
+            plot: Whether to plot the results. Defaults to True.
+            method: The fitting method to use. Defaults to "curve_fit".
+                    Available methods: 'curve_fit', 'minimize',
+                    'differential_evolution', 'shgo', 'dual_annealing',
+                    'emcee', 'bayesian_ridge'.
+                    'bayesian_ridge' requires scikit-learn and is only valid for
+                    linear models. 'emcee' requires emcee.
+                    Methods other than 'curve_fit' and 'bayesian_ridge' may require sigma (yerr).
+            fit_kwargs: Keyword arguments passed to the fitting function
+                        (e.g., `scipy.optimize.curve_fit`, `scipy.optimize.minimize`, etc.).
+            residuals: The type of residuals to plot ("none", "res", "percent", "rmse").
+                       Defaults to "res".
+            color_error: Color for data points/error bars. Defaults to "C0".
+            color_model: Color for the fitted model line. Defaults to "C3".
+            color_residuals: Color for the residuals plot. Defaults to "C0".
+            fmt_error: Marker style for data points. Defaults to ".".
+            ls_model: Line style for the model line. Defaults to "-".
+            ls_residuals: Line style for residuals. Defaults to "".
+            marker_residuals: Marker style for residuals. Defaults to ".".
+            err_kws: Additional keyword arguments for data/error bar plotting (`plt.errorbar`).
+            mod_kws: Additional keyword arguments for model line plotting (`plt.plot`).
+            res_kws: Additional keyword arguments for residuals plotting (`plt.plot`).
+            **parameters: Specification of model parameters (initial values, bounds, fixed).
+                          Passed as keyword arguments, e.g., `param_name={"value": 1, "min": 0}`.
 
         Returns
         -------
-            tuple[Model, plt.Axes | None, plt.Axes | None]:
-                The fitted model and the axes objects for the main plot and residuals
-                plot.
+            A tuple containing the fitted Model object, the main plot Axes (or None),
+            and the residuals plot Axes (or None).
 
         Raises
         ------
-            ColumnNotFoundError:
-                If the specified column is not found in the DataFrame.
+            ColumnNotFoundError: If a specified column (x, y, yerr) is not found.
+            ImportError: If a required library (e.g., scikit-learn, emcee) is not installed
+                         for the chosen method.
+            ValueError: If an invalid method is chosen, if required arguments (like sigma)
+                        are missing for a method, or if the fit fails.
         """
-        if range is not None:
-            # TODO @WSUcollins: Implement proper range filtering
-            # https://github.com/WSU-Carbon-Lab/ezfit/issues/1
-            warnings.warn(
-                """
-                DATA LOSS WARNING. Range is experimental and will modify the DataFrame.
-                """,
-                stacklevel=1,
-            )
-            self._df = self._df.query(f"{range[0]} < {x} < {range[1]}")
+        if err_kws is None:
+            err_kws = {}
+        if mod_kws is None:
+            mod_kws = {}
+        if res_kws is None:
+            res_kws = {}
 
-        model = self.fit(model, x, y, yerr, fit_kwargs=fit_kwargs, **parameters)
+        fitted_model = self.fit(
+            model=model,
+            x=x,
+            y=y,
+            yerr=yerr,
+            method=method,
+            fit_kwargs=fit_kwargs,
+            **parameters,
+        )
+
+        ax = None
+        ax_res = None
         if plot:
-            ax = plt.gca()
             ax, ax_res = self.plot(
-                x,
-                y,
-                model,
-                yerr,
-                ax=ax,
+                x=x,
+                y=y,
+                model=fitted_model,
+                yerr=yerr,
                 residuals=residuals,
                 color_error=color_error,
                 color_model=color_model,
@@ -168,93 +147,182 @@ class FitAccessor:
                 mod_kws=mod_kws,
                 res_kws=res_kws,
             )
-            return model, ax, ax_res
-        return model
+
+        return fitted_model, ax, ax_res
 
     def fit(
         self,
-        model: callable,
+        model: Callable[..., Any],
         x: str,
         y: str,
         yerr: str | None = None,
-        *,
-        # range: tuple[float, float] | None = None,
-        fit_kwargs: FitKwargs = None,
-        **parameters: dict[str, Parameter],
-    ):
-        """
-        Fit the data to the model.
+        method: Literal[
+            "curve_fit",
+            "minimize",
+            "differential_evolution",
+            "shgo",
+            "dual_annealing",
+            "emcee",
+            "bayesian_ridge",
+        ] = "curve_fit",  # Updated available methods
+        fit_kwargs: FitKwargs | None = None,
+        **parameters: dict[str, Any],
+    ) -> Model:
+        """Fit the data to the model.
 
         Args:
-            model (callable):
-                The model function to fit the data to.
-            x (str):
-                The name of the column in the DataFrame to use as the independent
-                variable.
-            y (str):
-                The name of the column in the DataFrame to use as the dependent
-                variable.
-            yerr (str | None, optional):
-                The name of the column in the DataFrame to use as the error on the
-                dependent variable.
-            fit_kwargs (FitKwargs, optional):
-                Keyword arguments to pass to `scipy.optimize.curve_fit`.
-            parameters (dict[str, Parameter]):
-                Specification of the model parameters, their initial values, and bounds.
+            model: The model function to fit the data to.
+            x: The name of the column for the independent variable.
+            y: The name of the column for the dependent variable.
+            yerr: The name of the column for the error on the dependent variable.
+            method: The fitting method to use. Defaults to "curve_fit".
+                    Available methods: 'curve_fit', 'minimize',
+                    'differential_evolution', 'shgo', 'dual_annealing',
+                    'emcee', 'bayesian_ridge'.
+                    'bayesian_ridge' requires scikit-learn and is only valid for
+                    linear models. 'emcee' requires emcee.
+                    Methods other than 'curve_fit' and 'bayesian_ridge' require sigma (yerr).
+            fit_kwargs: Keyword arguments passed to the underlying fitting function
+                        (e.g., `scipy.optimize.curve_fit`, `scipy.optimize.minimize`,
+                        `sklearn.linear_model.BayesianRidge`, `emcee.EnsembleSampler`).
+            **parameters: Specification of model parameters (initial values, bounds, fixed).
 
         Returns
         -------
-            Model:
-                The fitted model.
+            The fitted Model object.
 
         Raises
         ------
-            ColumnNotFoundError:
-                If the specified column is not found in the DataFrame.
+            ColumnNotFoundError: If a specified column (x, y, yerr) is not found.
+            ImportError: If a required library (e.g., scikit-learn, emcee) is not installed
+                         for the chosen method.
+            ValueError: If an invalid method is chosen, if required arguments (like sigma)
+                        are missing for a method, or if the fit fails.
         """
-        if x not in self._df.columns:
-            raise ColumnNotFoundError(x)
+        # Validate columns
+        for col in [x, y] + ([yerr] if yerr else []):
+            if col not in self._df.columns:
+                raise ColumnNotFoundError(col)
 
-        if y not in self._df.columns:
-            raise ColumnNotFoundError(y)
+        # Prepare data
+        xdata = self._df[x].to_numpy(dtype=float)
+        ydata = self._df[y].to_numpy(dtype=float)
+        sigma = self._df[yerr].to_numpy(dtype=float) if yerr else None
 
-        if yerr is not None and yerr not in self._df.columns:
-            raise ColumnNotFoundError(yerr)
-
-        xdata = self._df[x].values
-        ydata = self._df[y].values
-        yerr = self._df[yerr].values if yerr is not None else None
-
-        data_model = Model(model, parameters)
-        p0 = data_model.values()
-        bounds = data_model.bounds()
+        # Initialize model
+        model_obj = Model(func=model, params=parameters)
 
         if fit_kwargs is None:
             fit_kwargs = {}
 
-        popt, pcov, infodict, _, _ = curve_fit(
-            data_model.func,
-            xdata,
-            ydata,
-            p0=p0,
-            sigma=yerr,
-            bounds=bounds,
-            absolute_sigma=yerr is not None,
-            full_output=True,
-            **fit_kwargs,
-        )
+        # --- Select and call the appropriate optimizer ---
+        fit_result: FitResult
 
-        for i, (name, _) in enumerate(data_model):
-            data_model[name] = popt[i], np.sqrt(pcov[i, i])
+        try:
+            if method == "curve_fit":
+                fit_result = _fit_curve_fit(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast("CurveFitKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "minimize":
+                if sigma is None:
+                    raise ValueError("Method 'minimize' requires 'yerr' (sigma).")
+                fit_result = _fit_minimize(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast("MinimizeKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "differential_evolution":
+                if sigma is None:
+                    raise ValueError(
+                        "Method 'differential_evolution' requires 'yerr' (sigma)."
+                    )
+                fit_result = _fit_differential_evolution(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast(
+                        "DifferentialEvolutionKwargs", fit_kwargs
+                    ),  # Cast kwargs
+                )
+            elif method == "shgo":
+                if sigma is None:
+                    raise ValueError("Method 'shgo' requires 'yerr' (sigma).")
+                fit_result = _fit_shgo(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast("ShgoKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "dual_annealing":
+                if sigma is None:
+                    raise ValueError("Method 'dual_annealing' requires 'yerr' (sigma).")
+                fit_result = _fit_dual_annealing(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast("DualAnnealingKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "emcee":
+                if sigma is None:
+                    raise ValueError("Method 'emcee' requires 'yerr' (sigma).")
+                fit_result = _fit_emcee(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=cast("EmceeKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "bayesian_ridge":
+                # Check for linear model is now inside _fit_bayesian_ridge
+                fit_result = _fit_bayesian_ridge(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    # sigma is not directly used by BR fit, but might be needed for chi2 calc
+                    sigma=sigma,
+                    fit_kwargs=cast("BayesianRidgeKwargs", fit_kwargs),  # Cast kwargs
+                )
+            else:
+                # This should ideally be caught by Literal, but added for safety
+                msg = f"Unsupported fitting method: {method}"
+                raise ValueError(msg)
 
-        data_model.residuals = infodict["fvec"]
-        data_model.𝜒2 = np.sum(data_model.residuals**2)
-        dof = len(xdata) - len(popt)
-        data_model.r𝜒2 = data_model.𝜒2 / dof
-        data_model.cov = pcov
-        data_model.cor = pcov / np.outer(np.sqrt(np.diag(pcov)), np.sqrt(np.diag(pcov)))
+        except (RuntimeError, ValueError, ImportError) as e:
+            # Catch potential errors from optimizer functions or import issues
+            msg = f"Fitting with method '{method}' failed: {e}"
+            raise ValueError(msg) from e
+        # --- End of optimizer selection ---
 
-        return data_model
+        # --- Update model_obj with results from fit_result ---
+        model_obj.residuals = fit_result["residuals"]
+        model_obj.𝜒2 = fit_result["chi2"]
+        model_obj.r𝜒2 = fit_result["rchi2"]
+        model_obj.cov = fit_result["cov"]
+        model_obj.cor = fit_result["cor"]
+        model_obj.fit_result_details = fit_result.get(
+            "details"
+        )  # Store extra details if present
+
+        # Update model parameters with fitted values and errors
+        popt = fit_result["popt"]
+        perr = fit_result["perr"]
+        for i, name in enumerate(model_obj.params):
+            # Ensure we don't try to access perr if it's None or shorter than popt
+            # (e.g., Bayesian Ridge might not provide all errors)
+            error = perr[i] if perr is not None and i < len(perr) else np.nan
+            model_obj[name] = (popt[i], error)
+        # --- End of model update ---
+
+        return model_obj
 
     def plot(
         self,
@@ -262,8 +330,7 @@ class FitAccessor:
         y: str,
         model: Model,
         yerr: str | None = None,
-        *,
-        ax: plt.Axes = None,
+        ax: Axes | None = None,
         residuals: Literal["none", "res", "percent", "rmse"] = "res",
         color_error: str = "C0",
         color_model: str = "C3",
@@ -272,211 +339,146 @@ class FitAccessor:
         ls_model: str = "-",
         ls_residuals: str = "",
         marker_residuals: str = ".",
-        err_kws: dict | None = None,
-        mod_kws: dict | None = None,
-        res_kws: dict | None = None,
-    ) -> plt.Axes | tuple[plt.Axes, plt.Axes]:
-        """
-        Plot the data, model, and residuals.
-
-        Plot the data using matplotlib's `errorbar` function, the model using the
-        defualt `plot` artist, and a difference metric between the data and model as
-        a plot below the main plot. The difference metric can be the residuals, the
-        percent difference, or the root mean squared error.
+        err_kws: dict[str, Any] | None = None,
+        mod_kws: dict[str, Any] | None = None,
+        res_kws: dict[str, Any] | None = None,
+    ) -> Axes | tuple[Axes, Axes]:
+        """Plot the data, model, and residuals.
 
         Args:
-            x (str):
-                The name of the column in the DataFrame to use as the independent
-                variable.
-            y (str):
-                The name of the column in the DataFrame to use as the dependent
-                variable.
-            model (callable):
-                The model function to fit the data to.
-            yerr (str, optional):
-                The name of the column in the DataFrame to use as the
-                error on the dependent variable.
-            plot (bool, optional):
-                Whether to plot the results.
-                fit_kwargs (FitKwargs, optional): Keyword arguments to pass to
-                `scipy.optimize.curve_fit`.
-            residuals (Literal["none", "res", "percent", "rmse"], optional):
-                The type of residuals to plot.
-                - "none": Do not plot residuals.
-                - "res": Plot the residuals.
-                    residuals = (ydata - nominal) / yerr
-                - "percent": Plot the percent difference.
-                    percent = 100 * (ydata - nominal) / ydata
-                - "rmse": Plot the root mean squared error.
-                    rmse = sqrt((ydata - nominal)^2)
-            color_error (str, optional):
-                The color of the error bars.
-            color_model (str, optional):
-                The color of the model line.
-            color_residuals (str, optional):
-                The color of the residuals.
-            fmt_error (str, optional):
-                The marker style for the error bars.
-            ls_model (str, optional):
-                The line style for the model line.
-            ls_residuals (str, optional):
-                The line style for the residuals.
-            marker_residuals (str, optional):
-                The marker style for the residuals.
-            err_kws (dict, optional):
-                Additional keyword arguments for errorbar plotting.
-            mod_kws (dict, optional):
-                Additional keyword arguments for model line plotting.
-            res_kws (dict, optional):
-                Additional keyword arguments for residuals plotting.
-            parameters (dict[str, Parameter]):
-                Specification of the model parameters, their initial values, and bounds.
+            x: The name of the column for the independent variable.
+            y: The name of the column for the dependent variable.
+            model: The fitted Model object containing the function and parameters.
+            yerr: The name of the column for the error on the dependent variable.
+            ax: An existing Matplotlib Axes object to plot on. If None, a new figure/axes is created.
+            residuals: The type of residuals to plot ("none", "res", "percent", "rmse").
+            color_error: Color for data points/error bars.
+            color_model: Color for the fitted model line.
+            color_residuals: Color for the residuals plot.
+            fmt_error: Marker style for data points.
+            ls_model: Line style for the model line.
+            ls_residuals: Line style for residuals.
+            marker_residuals: Marker style for residuals.
+            err_kws: Additional keyword arguments for `plt.errorbar`.
+            mod_kws: Additional keyword arguments for model line `plt.plot`.
+            res_kws: Additional keyword arguments for residuals `plt.plot`.
 
         Returns
         -------
-            plt.Axes | tuple[plt.Axes, plt.Axes]:
-            The axes object for the main plot and residuals plot if `residuals` is not
-            "none".
+            The main plot Axes object, or a tuple of (main Axes, residuals Axes)
+            if residuals are plotted.
 
         Raises
         ------
-            ColumnNotFoundError:
-            If the specified column is not found in the DataFrame. ValueError: If an
-            invalid residuals metric is specified.
+            ColumnNotFoundError: If a specified column (x, y, yerr) is not found.
+            ValueError: If an invalid residuals metric is specified or model has no parameters.
         """
-        warnings.filterwarnings("ignore")
+        if err_kws is None:
+            err_kws = {}
+        if mod_kws is None:
+            mod_kws = {}
+        if res_kws is None:
+            res_kws = {}
 
+        # Validate columns
+        for col in [x, y] + ([yerr] if yerr else []):
+            if col not in self._df.columns:
+                raise ColumnNotFoundError(col)
+
+        # Prepare data
+        xdata = self._df[x].to_numpy(dtype=float)
+        ydata = self._df[y].to_numpy(dtype=float)
+        sigma = self._df[yerr].to_numpy(dtype=float) if yerr else None
+
+        # Setup plot axes
         if ax is None:
-            ax = plt.gca()
+            if residuals != "none":
+                fig, (main_ax, res_ax) = plt.subplots(
+                    2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
+                )
+                fig.subplots_adjust(hspace=0.05)
+            else:
+                fig, main_ax = plt.subplots()
+                res_ax = None
+        else:
+            # Assume user handles subplot creation if providing an axis
+            main_ax = ax
+            res_ax = (
+                None  # Cannot easily create residual plot on user-provided single axis
+            )
+            if residuals != "none":
+                warnings.warn(
+                    "Residual plot cannot be automatically created when providing a single Axes object."
+                )
+                residuals = "none"
 
-        if x not in self._df.columns:
-            raise ColumnNotFoundError(x)
-
-        if y not in self._df.columns:
-            raise ColumnNotFoundError(y)
-
-        if yerr is not None and yerr not in self._df.columns:
-            raise ColumnNotFoundError(yerr)
-
-        xdata = self._df[x].values
-        ydata = self._df[y].values
-        yerr_values = self._df[yerr].values if yerr is not None else None
-        nominal = model(xdata)
-
-        err_kws = {} if err_kws is None else err_kws
-        mod_kws = {} if mod_kws is None else mod_kws
-        res_kws = {} if res_kws is None else res_kws
-
-        err_kws = {
-            "color": color_error,
-            "fmt": fmt_error,
-            "ms": 8,
-            "zorder": 0,
-            "alpha": 1,
-            **err_kws,
-        }
-        mod_kws = {"c": color_model, "ls": ls_model, "zorder": 1, **mod_kws}
-        res_kws = {
-            "c": color_residuals,
-            "ls": ls_residuals,
-            "marker": marker_residuals,
-            **res_kws,
-        }
-
-        ax.errorbar(
+        # Plot data
+        main_ax.errorbar(
             xdata,
             ydata,
-            yerr=yerr_values,
-            label=y,
+            yerr=sigma,
+            fmt=fmt_error,
+            color=color_error,
+            label="Data",
             **err_kws,
         )
-        ax.plot(xdata, nominal, label=model.func.__name__, **mod_kws)
 
-        if residuals == "none" or residuals is None:
-            return ax
+        # Plot model
+        if model.params is None:
+            raise ValueError("Model has no parameters to evaluate.")
 
-        ax_res = ax.inset_axes([0, -0.3, 1, 0.2])
-        match residuals:
-            case "res":
-                err_metric = (
-                    ydata - nominal
-                    if yerr_values is None
-                    else (ydata - nominal) / yerr_values
-                )
-                lines = [
-                    0,
-                    np.percentile(err_metric, 95),
-                    np.percentile(err_metric, 99.6),
-                    np.percentile(err_metric, 5),
-                    np.percentile(err_metric, 0.4),
-                ]
-            case "percent":
-                err_metric = 100 * (ydata - nominal) / ydata
-                lines = [
-                    0,
-                    np.percentile(err_metric, 95),
-                    np.percentile(err_metric, 99.6),
-                    np.percentile(err_metric, 5),
-                    np.percentile(err_metric, 0.4),
-                ]
-            case "rmse":
-                err_metric = np.sqrt((ydata - nominal) ** 2)
-                lines = [
-                    0,
-                    np.percentile(err_metric, 95),
-                    np.percentile(err_metric, 99.6),
-                ]
-            case _:
-                e = "Invalid residuals metric"
-                raise ValueError(e)
-        ls = ["-", "--", ":", "--", ":"]
-        for i, line in enumerate(lines):
-            ax_res.axhline(line, color="grey", linestyle=ls[i], alpha=0.5)
+        # Generate smoother x for plotting model line
+        x_smooth = np.linspace(xdata.min(), xdata.max(), 500)
+        y_model = model(x_smooth)  # Use the Model object's __call__
 
-        ax_res.plot(xdata, err_metric, **res_kws)
-
-        ax.set_xlim(min(xdata), max(xdata))
-        ax_res.set_xlim(min(xdata), max(xdata))
-        ax_res.set_xlabel(x)
-        ax_res.get_figure().tight_layout()
-        ax_res.ticklabel_format(
-            axis="y", style="sci", useMathText=True, scilimits=(0, 0)
+        main_ax.plot(
+            x_smooth, y_model, ls=ls_model, color=color_model, label="Model", **mod_kws
         )
-        ax.set_xticklabels([])
-        ax.set_xticks([])
-        ax.set_ylabel(y)
-        ax.legend()
-        return ax, ax_res
+        main_ax.set_ylabel(y)
+        main_ax.legend()
 
+        # Plot residuals if requested
+        if residuals != "none" and res_ax is not None:
+            y_model_at_data = model(xdata)  # Evaluate model at original x points
+            res_val = ydata - y_model_at_data
 
-if __name__ == "__main__":
-    from functions import linear
+            if residuals == "res":
+                if sigma is not None:
+                    plot_res = res_val / sigma
+                    res_ylabel = "Residuals\n($\\sigma$)"
+                else:
+                    plot_res = res_val
+                    res_ylabel = "Residuals"
+            elif residuals == "percent":
+                # Avoid division by zero
+                valid_idx = ydata != 0
+                plot_res = np.full_like(ydata, np.nan)
+                plot_res[valid_idx] = 100 * res_val[valid_idx] / ydata[valid_idx]
+                res_ylabel = "Residuals\n(%)"
+            elif residuals == "rmse":
+                plot_res = np.sqrt(res_val**2)
+                res_ylabel = "RMSE"
+            else:
+                msg = f"Invalid residuals type: {residuals}"
+                raise ValueError(msg)
 
-    df = pd.DataFrame(
-        {
-            "q": np.linspace(2e-5, 1e-3, 1000),
-            "int": np.linspace(9.8, 9.4, 1000) + np.random.normal(0, 0.001, 1000),
-            "int_err": 0.01 * np.ones(1000),
-        }
-    )
+            res_ax.plot(
+                xdata,
+                plot_res,
+                marker=marker_residuals,
+                ls=ls_residuals,
+                color=color_residuals,
+                **res_kws,
+            )
+            res_ax.axhline(0, color="k", linestyle="--", alpha=0.5)
+            res_ax.set_xlabel(x)
+            res_ax.set_ylabel(res_ylabel)
 
-    model, ax, ax_res = df.query("0 < `q` < 10").fit(
-        linear,
-        "q",
-        "int",
-        "int_err",
-        color_error="C2",
-        m={"value": -400, "max": -300, "min": -500},
-        err_kws={
-            "fmt": "o",
-            "ms": 1,
-            "capsize": 2,
-            "ecolor": "black",
-            "errorevery": 10,
-        },
-    )
-    ax.set_title("Linear fit")
-    ax_res.set_title("Residuals")
-    ax.figure.set_size_inches(12, 6)
-    print(model)
-    plt.show()
+            # Align y-axis labels
+            main_ax.yaxis.set_label_coords(-0.1, 0.5)
+            res_ax.yaxis.set_label_coords(-0.1, 0.5)
+
+            return main_ax, res_ax
+        else:
+            main_ax.set_xlabel(x)
+            return main_ax
