@@ -1,0 +1,33 @@
+/* Custom CSS for ezfit documentation */
+
+/* Improve code block appearance */
+.highlight {
+  border-radius: 4px;
+}
+
+/* Style for note boxes */
+.admonition.note {
+  border-left: 4px solid #0066cc;
+}
+
+/* Style for warning boxes */
+.admonition.warning {
+  border-left: 4px solid #ff9900;
+}
+
+/* Improve table appearance */
+table.docutils {
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+table.docutils th,
+table.docutils td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+table.docutils th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}

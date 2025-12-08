@@ -16,8 +16,12 @@ from ezfit.optimizers import (  # Import optimizer functions
     _fit_curve_fit,
     _fit_differential_evolution,
     _fit_dual_annealing,
+    _fit_elasticnet,
     _fit_emcee,
+    _fit_lasso,
     _fit_minimize,
+    _fit_polynomial,
+    _fit_ridge,
     _fit_shgo,
 )
 from ezfit.types import (  # Import specific Kwargs types
@@ -164,6 +168,10 @@ class FitAccessor:
             "dual_annealing",
             "emcee",
             "bayesian_ridge",
+            "ridge",
+            "lasso",
+            "elasticnet",
+            "polynomial",
         ] = "curve_fit",  # Updated available methods
         fit_kwargs: FitKwargs | None = None,
         **parameters: dict[str, Any],
@@ -290,6 +298,38 @@ class FitAccessor:
                     # sigma is not directly used by BR fit, but might be needed for chi2 calc
                     sigma=sigma,
                     fit_kwargs=cast("BayesianRidgeKwargs", fit_kwargs),  # Cast kwargs
+                )
+            elif method == "ridge":
+                fit_result = _fit_ridge(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=fit_kwargs or {},
+                )
+            elif method == "lasso":
+                fit_result = _fit_lasso(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=fit_kwargs or {},
+                )
+            elif method == "elasticnet":
+                fit_result = _fit_elasticnet(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=fit_kwargs or {},
+                )
+            elif method == "polynomial":
+                fit_result = _fit_polynomial(
+                    model=model_obj,
+                    xdata=xdata,
+                    ydata=ydata,
+                    sigma=sigma,
+                    fit_kwargs=fit_kwargs or {},
                 )
             else:
                 # This should ideally be caught by Literal, but added for safety

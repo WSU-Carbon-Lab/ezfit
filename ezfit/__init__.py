@@ -224,6 +224,23 @@ b : (value=-0.4650788531268627 ± 0.0903, bounds=(-inf, inf))
 
 '''  # noqa: D214, D215
 
+from ezfit.constraints import (
+    less_than,
+    greater_than,
+    sum_less_than,
+    sum_greater_than,
+    product_equals,
+    parse_constraint_string,
+)
+from ezfit.examples import (
+    generate_exponential_decay_data,
+    generate_gaussian_data,
+    generate_linear_data,
+    generate_multi_peak_data,
+    generate_oscillatory_data,
+    generate_polynomial_data,
+    generate_rugged_surface_data,
+)
 from ezfit.fit import FitAccessor
 from ezfit.functions import (
     exponential,
@@ -234,6 +251,7 @@ from ezfit.functions import (
     pseudo_voigt,
 )
 from ezfit.model import Model, Parameter
+from ezfit.visualization import plot_corner, plot_trace, plot_posterior
 
 __all__ = [
     "FitAccessor",
@@ -245,4 +263,23 @@ __all__ = [
     "lorentzian",
     "power_law",
     "pseudo_voigt",
+    # Constraint utilities
+    "less_than",
+    "greater_than",
+    "sum_less_than",
+    "sum_greater_than",
+    "product_equals",
+    "parse_constraint_string",
+    # Visualization utilities
+    "plot_corner",
+    "plot_trace",
+    "plot_posterior",
+    # Example data generators
+    "generate_linear_data",
+    "generate_polynomial_data",
+    "generate_gaussian_data",
+    "generate_multi_peak_data",
+    "generate_rugged_surface_data",
+    "generate_exponential_decay_data",
+    "generate_oscillatory_data",
 ]

@@ -20,6 +20,10 @@ FitMethod = Literal[
     "dual_annealing",
     "bayesian_ridge",
     "emcee",
+    "ridge",
+    "lasso",
+    "elasticnet",
+    "polynomial",
 ]
 
 type FitKwargs = (
