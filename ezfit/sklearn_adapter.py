@@ -60,7 +60,8 @@ class SklearnModelWrapper:
         Args:
             x: Input data (n_samples,).
 
-        Returns:
+        Returns
+        -------
             Predicted values.
         """
         # For sklearn, we need to construct the feature matrix for new x values
@@ -78,7 +79,8 @@ def is_linear_model(func: "Callable") -> bool:
     Args:
         func: Function to check.
 
-    Returns:
+    Returns
+    -------
         True if function appears to be linear in parameters, False otherwise.
     """
     # Get function signature
@@ -138,7 +140,8 @@ def construct_design_matrix(
         p0: Initial parameter values.
         eps: Step size for finite differences.
 
-    Returns:
+    Returns
+    -------
         Design matrix of shape (n_samples, n_params).
     """
     n_samples = len(xdata)
@@ -171,7 +174,8 @@ def convert_to_polynomial_model(
         xdata: Independent variable data.
         degree: Polynomial degree.
 
-    Returns:
+    Returns
+    -------
         Tuple of (feature_matrix, PolynomialFeatures transformer).
     """
     if PolynomialFeatures is None:

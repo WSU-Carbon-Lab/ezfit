@@ -491,10 +491,12 @@ def _fit_bayesian_ridge(
         sigma: Error on dependent variable (used for weighting if provided).
         fit_kwargs: Keyword arguments for BayesianRidge.
 
-    Returns:
+    Returns
+    -------
         FitResult with fitted parameters and statistics.
 
-    Raises:
+    Raises
+    ------
         ImportError: If scikit-learn is not installed.
         ValueError: If model is not linear in parameters.
     """

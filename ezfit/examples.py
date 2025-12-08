@@ -29,7 +29,8 @@ def generate_linear_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -55,13 +56,15 @@ def generate_polynomial_data(
 
     Args:
         n_points: Number of data points to generate.
-        coefficients: Polynomial coefficients [a0, a1, a2, ...] for a0 + a1*x + a2*x^2 + ...
+        coefficients: Polynomial coefficients [a0, a1, a2, ...]
+            for a0 + a1*x + a2*x^2 + ...
                      If None, uses [1, -2, 0.5] (quadratic).
         noise_level: Standard deviation of Gaussian noise.
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -101,7 +104,8 @@ def generate_gaussian_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -139,7 +143,8 @@ def generate_multi_peak_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -187,7 +192,8 @@ def generate_rugged_surface_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -223,7 +229,8 @@ def generate_exponential_decay_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:
@@ -264,7 +271,8 @@ def generate_oscillatory_data(
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
 
-    Returns:
+    Returns
+    -------
         DataFrame with columns 'x', 'y', and 'yerr'.
     """
     if seed is not None:

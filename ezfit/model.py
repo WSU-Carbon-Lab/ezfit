@@ -16,7 +16,8 @@ from ezfit.types import FitResult
 class Parameter:
     """Data class for a parameter and its bounds.
 
-    Attributes:
+    Attributes
+    ----------
         value: Initial/default value of the parameter.
         fixed: Whether the parameter is fixed (not varied during fitting).
         min: Minimum allowed value (lower bound).
@@ -90,7 +91,7 @@ class Parameter:
                     msg = f"constraint function must accept a dict[str, float] and return bool: {e}"
                     raise ValueError(msg) from e
                 # KeyError is acceptable - constraint will be validated at fit time
-            except Exception as e:
+            except Exception:
                 # Other exceptions might indicate a real problem
                 # But we'll be lenient and let it pass - will fail at fit time if truly broken
                 pass
@@ -290,10 +291,12 @@ class Model:
         Args:
             **kwargs: Additional keyword arguments passed to plot_corner.
 
-        Returns:
+        Returns
+        -------
             Tuple of (figure, axes_array).
 
-        Raises:
+        Raises
+        ------
             ValueError: If no MCMC chain is available.
         """
         from ezfit.visualization import plot_corner
@@ -311,10 +314,12 @@ class Model:
         Args:
             **kwargs: Additional keyword arguments passed to plot_trace.
 
-        Returns:
+        Returns
+        -------
             Tuple of (figure, axes_array).
 
-        Raises:
+        Raises
+        ------
             ValueError: If no MCMC chain is available.
         """
         from ezfit.visualization import plot_trace
@@ -333,10 +338,12 @@ class Model:
             discard: Number of samples to discard as burn-in. If None, uses automatic detection.
             thin: Thinning factor. If None, uses automatic thinning.
 
-        Returns:
+        Returns
+        -------
             Array of posterior samples.
 
-        Raises:
+        Raises
+        ------
             ValueError: If no MCMC chain is available.
         """
         if self.sampler_chain is None:
@@ -367,7 +374,8 @@ class Model:
     def summary(self) -> str:
         """Print a summary of the fit including diagnostics.
 
-        Returns:
+        Returns
+        -------
             String summary of the fit.
         """
         summary_lines = [self.describe()]

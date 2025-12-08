@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 if TYPE_CHECKING:
-    from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
 try:
@@ -39,10 +38,12 @@ def plot_corner(
         fig: Existing matplotlib Figure to plot on. If None, creates new figure.
         **kwargs: Additional keyword arguments passed to corner.corner().
 
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes_array).
 
-    Raises:
+    Raises
+    ------
         ImportError: If corner package is not installed.
     """
     if corner is None:
@@ -102,7 +103,8 @@ def plot_trace(
         fig: Existing matplotlib Figure to plot on. If None, creates new figure.
         axes: Existing axes array to plot on. If None, creates new axes.
 
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes_array).
     """
     # Handle different chain shapes
@@ -173,7 +175,8 @@ def plot_posterior(
         axes: Existing axes array to plot on. If None, creates new axes.
         bins: Number of bins for histograms.
 
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes_array).
     """
     # Flatten chain if 3D
@@ -248,7 +251,8 @@ def plot_arviz_summary(
         param_names: List of parameter names for labels. If None, uses "param0", "param1", etc.
         **kwargs: Additional keyword arguments passed to arviz plotting functions.
 
-    Returns:
+    Returns
+    -------
         matplotlib Figure if arviz is available, None otherwise.
     """
     if az is None:

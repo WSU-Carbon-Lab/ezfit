@@ -4,12 +4,8 @@ This module provides functions for analyzing MCMC chains, checking convergence,
 and computing diagnostic statistics like effective sample size and Gelman-Rubin statistic.
 """
 
-from typing import TYPE_CHECKING
 
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 try:
     import arviz as az
@@ -27,7 +23,8 @@ def compute_ess(chain: np.ndarray, axis: int = 0) -> float:
         chain: MCMC chain array of shape (n_samples, n_params) or (n_walkers, n_steps, n_params).
         axis: Axis along which to compute ESS (0 for samples, 1 for walkers if 3D).
 
-    Returns:
+    Returns
+    -------
         Effective sample size.
     """
     if chain.ndim == 3:
@@ -93,7 +90,8 @@ def gelman_rubin(chain: np.ndarray) -> float:
         chain: MCMC chain array of shape (n_walkers, n_steps, n_params) or
                (n_samples, n_params) if already flattened.
 
-    Returns:
+    Returns
+    -------
         R-hat statistic (maximum over all parameters).
     """
     if chain.ndim == 2:
@@ -152,7 +150,8 @@ def estimate_burnin(
                 or "integrated" (integrated autocorrelation time).
         threshold: Threshold for convergence (for autocorr method).
 
-    Returns:
+    Returns
+    -------
         Estimated burn-in period (number of samples to discard).
     """
     if chain.ndim == 3:
@@ -238,7 +237,8 @@ def check_convergence(
         ess_min: Minimum effective sample size for convergence.
         burnin: Burn-in period to discard. If None, estimated automatically.
 
-    Returns:
+    Returns
+    -------
         Tuple of (converged, diagnostics_dict).
         converged is True if all diagnostics indicate convergence.
         diagnostics_dict contains: rhat, ess, burnin, n_effective_samples.

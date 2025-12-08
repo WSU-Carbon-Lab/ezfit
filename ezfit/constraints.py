@@ -58,15 +58,19 @@ class Constraint:
             param_names: List of parameter names in order.
             param_indices: Mapping from parameter name to index.
 
-        Returns:
+        Returns
+        -------
             scipy NonlinearConstraint object.
         """
         if NonlinearConstraint is None:
-            msg = "scipy.optimize.NonlinearConstraint is required but scipy is not installed."
+            msg = (
+                "scipy.optimize.NonlinearConstraint is required "
+                "but scipy is not installed."
+            )
             raise ImportError(msg)
 
         def constraint_func(x: np.ndarray) -> np.ndarray:
-            """Wrapper to convert parameter dict to array."""
+            """Convert parameter dict to array."""
             return np.array([self.constraint_func(x)])
 
         return NonlinearConstraint(
@@ -83,7 +87,8 @@ def less_than(param1: str, param2: str) -> Callable[[dict[str, float]], bool]:
         param1: Name of first parameter.
         param2: Name of second parameter.
 
-    Returns:
+    Returns
+    -------
         Constraint function that returns True if param1 < param2.
     """
     return lambda p: p[param1] < p[param2]
@@ -96,33 +101,40 @@ def greater_than(param1: str, param2: str) -> Callable[[dict[str, float]], bool]
         param1: Name of first parameter.
         param2: Name of second parameter.
 
-    Returns:
+    Returns
+    -------
         Constraint function that returns True if param1 > param2.
     """
     return lambda p: p[param1] > p[param2]
 
 
-def sum_less_than(params: list[str], value: float) -> Callable[[dict[str, float]], bool]:
+def sum_less_than(
+    params: list[str], value: float
+) -> Callable[[dict[str, float]], bool]:
     """Create a constraint function: sum(params) < value.
 
     Args:
         params: List of parameter names to sum.
         value: Maximum value for the sum.
 
-    Returns:
+    Returns
+    -------
         Constraint function that returns True if sum < value.
     """
     return lambda p: sum(p[param] for param in params) < value
 
 
-def sum_greater_than(params: list[str], value: float) -> Callable[[dict[str, float]], bool]:
+def sum_greater_than(
+    params: list[str], value: float
+) -> Callable[[dict[str, float]], bool]:
     """Create a constraint function: sum(params) > value.
 
     Args:
         params: List of parameter names to sum.
         value: Minimum value for the sum.
 
-    Returns:
+    Returns
+    -------
         Constraint function that returns True if sum > value.
     """
     return lambda p: sum(p[param] for param in params) > value
@@ -138,7 +150,8 @@ def product_equals(
         value: Target value for the product.
         tolerance: Tolerance for equality check.
 
-    Returns:
+    Returns
+    -------
         Constraint function that returns True if product ≈ value.
     """
     return lambda p: abs(np.prod([p[param] for param in params]) - value) < tolerance
@@ -158,10 +171,12 @@ def parse_constraint_string(
         constraint_str: String representation of constraint.
         param_names: List of valid parameter names.
 
-    Returns:
+    Returns
+    -------
         Constraint function.
 
-    Raises:
+    Raises
+    ------
         ValueError: If constraint string cannot be parsed.
     """
     # Simple parser for basic constraints
@@ -248,8 +263,10 @@ def extract_constraints_from_model(
     Args:
         model: Model object with parameters that may have constraints.
 
-    Returns:
-        List of constraint functions that take parameter array and return constraint value.
+    Returns
+    -------
+        List of constraint functions that take parameter array
+        and return constraint value.
     """
     constraints = []
 
@@ -257,7 +274,6 @@ def extract_constraints_from_model(
         return constraints
 
     param_names = list(model.params.keys())
-    param_indices = {name: i for i, name in enumerate(param_names)}
 
     for param_name, param in model.params.items():
         if param.constraint is not None:
@@ -268,7 +284,7 @@ def extract_constraints_from_model(
                 def array_constraint(x: np.ndarray) -> float:
                     param_dict = {param_names[i]: x[i] for i in range(len(param_names))}
                     satisfied = constraint_func(param_dict)
-                    # Return negative value if satisfied (for scipy: <= 0 means satisfied)
+                    # Return negative if satisfied (scipy: <= 0 means satisfied)
                     return -1.0 if satisfied else 1.0
 
                 return array_constraint
@@ -286,10 +302,13 @@ def validate_constraints(
 
     Args:
         model: Model with parameters and constraints.
-        initial_values: Initial parameter values to test. If None, uses parameter values.
+        initial_values: Initial parameter values to test.
+            If None, uses parameter values.
 
-    Returns:
-        Tuple of (is_valid, error_message). is_valid is True if constraints are satisfiable.
+    Returns
+    -------
+        Tuple of (is_valid, error_message).
+        is_valid is True if constraints are satisfiable.
     """
     if model.params is None:
         return True, None
@@ -311,7 +330,8 @@ def validate_constraints(
             except KeyError as e:
                 return (
                     False,
-                    f"Constraint on parameter '{param_name}' references unknown parameter: {e}",
+                    f"Constraint on parameter '{param_name}' "
+                    f"references unknown parameter: {e}",
                 )
             except Exception as e:
                 return (
