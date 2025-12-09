@@ -9,6 +9,7 @@ import emcee
 import numpy as np
 from scipy.optimize import (
     OptimizeResult,
+    approx_fprime,
     curve_fit,
     differential_evolution,
     dual_annealing,
@@ -344,12 +345,62 @@ def _fit_differential_evolution(
         warnings.warn(f"differential_evolution raised an exception: {e}", stacklevel=2)
         popt = np.full_like(p0, np.nan)
         result = OptimizeResult(x=popt, success=False, message=str(e))
+        pcov = np.full((len(popt), len(popt)), np.nan)
+        perr = np.full_like(popt, np.nan)
+    else:
+        # Estimate covariance matrix using numerical Hessian
+        # Global optimizers don't provide covariance, so we compute it numerically
+        try:
+            # Compute Hessian numerically using finite differences
+            def chi2_func(params: np.ndarray) -> float:
+                y_model = model.func(xdata, *params)
+                safe_sigma = np.where(sigma == 0, 1e-10, sigma)
+                return np.sum(((y_model - ydata) / safe_sigma) ** 2)
 
-    warnings.warn(
-        "Covariance matrix not available from differential_evolution.", stacklevel=2
-    )
-    pcov = np.full((len(popt), len(popt)), np.nan)
-    perr = np.full_like(popt, np.nan)
+            # Compute gradient
+            eps = np.sqrt(np.finfo(float).eps)
+            grad = approx_fprime(popt, chi2_func, eps)
+
+            # Compute Hessian using second-order finite differences
+            n_params = len(popt)
+            hessian = np.zeros((n_params, n_params))
+            for i in range(n_params):
+                p_plus = popt.copy()
+                p_plus[i] += eps
+                grad_plus = approx_fprime(p_plus, chi2_func, eps)
+                hessian[i, :] = (grad_plus - grad) / eps
+
+            # Symmetrize Hessian
+            hessian = (hessian + hessian.T) / 2.0
+
+            # Invert Hessian to get covariance (multiply by 2 for chi-squared)
+            try:
+                pcov = 2.0 * np.linalg.inv(hessian)
+                # Ensure positive definite
+                eigvals = np.linalg.eigvals(pcov)
+                if np.any(eigvals <= 0):
+                    warnings.warn(
+                        "Estimated covariance matrix is not positive definite. "
+                        "Uncertainties may be unreliable.",
+                        stacklevel=2,
+                    )
+                perr = np.sqrt(np.diag(pcov))
+            except np.linalg.LinAlgError:
+                warnings.warn(
+                    "Could not invert Hessian to compute covariance matrix. "
+                    "Uncertainties not available.",
+                    stacklevel=2,
+                )
+                pcov = np.full((len(popt), len(popt)), np.nan)
+                perr = np.full_like(popt, np.nan)
+        except Exception as e:
+            warnings.warn(
+                f"Could not estimate covariance matrix: {e}. "
+                "Uncertainties not available.",
+                stacklevel=2,
+            )
+            pcov = np.full((len(popt), len(popt)), np.nan)
+            perr = np.full_like(popt, np.nan)
     residuals, chi2, rchi2, cor = _calculate_fit_stats(
         model, xdata, ydata, sigma, popt, pcov
     )
@@ -1008,6 +1059,11 @@ def _fit_emcee(
     else:
         discard = fit_kwargs.pop("discard", nsteps // 2)
 
+    # Ensure burn-in doesn't remove all samples (keep at least 100 samples)
+    min_samples_after_burnin = 100
+    max_discard = max(0, nsteps - min_samples_after_burnin)
+    discard = min(discard, max_discard)
+
     # Automatic thinning based on autocorrelation if thin not provided
     auto_thin = fit_kwargs.pop("auto_thin", True)
     thin = fit_kwargs.pop("thin", None)
@@ -1015,15 +1071,33 @@ def _fit_emcee(
         if auto_thin and full_chain is not None:
             # Estimate thinning from autocorrelation
             # Use a conservative estimate: thin by ~10-20
-            thin = max(1, min(20, nsteps // (discard + 100)))
+            # But ensure we keep at least 50 samples after thinning
+            samples_after_burnin = nsteps - discard
+            max_thin = max(1, samples_after_burnin // 50)
+            thin = max(1, min(20, max_thin))
         else:
             thin = 15
+
+    # Ensure thinning doesn't remove all samples
+    samples_after_burnin = nsteps - discard
+    if samples_after_burnin // thin < 10:
+        thin = max(1, samples_after_burnin // 10)
 
     flat = fit_kwargs.pop("flat", True)
 
     # Get processed chain
     try:
         chain = sampler.get_chain(discard=discard, thin=thin, flat=flat)
+        # Validate chain
+        if chain is not None and chain.size > 0:
+            # Check if chain has valid (finite) values
+            if np.all(~np.isfinite(chain)):
+                warnings.warn(
+                    "MCMC chain contains only NaN/Inf values. "
+                    "Sampler may have failed.",
+                    stacklevel=2,
+                )
+                chain = None
     except Exception as e:
         warnings.warn(f"Could not retrieve processed chain from sampler: {e}", stacklevel=2)
         chain = None
@@ -1033,15 +1107,28 @@ def _fit_emcee(
 
     # Run convergence diagnostics
     diagnostics = None
-    if chain_for_diagnostics is not None:
+    if chain_for_diagnostics is not None and chain_for_diagnostics.size > 0:
         try:
-            converged, diagnostics = check_convergence(
-                chain_for_diagnostics, burnin=discard if full_chain is not None else None
-            )
-            if not converged:
+            # Ensure we have enough samples for diagnostics
+            if chain_for_diagnostics.ndim == 3:
+                min_samples = chain_for_diagnostics.shape[1]
+            else:
+                min_samples = chain_for_diagnostics.shape[0]
+
+            if min_samples > 10:  # Need at least 10 samples
+                converged, diagnostics = check_convergence(
+                    chain_for_diagnostics, burnin=discard if full_chain is not None else None
+                )
+                if not converged:
+                    warnings.warn(
+                        f"MCMC chain may not have converged. R-hat: {diagnostics.get('rhat', 'N/A')}, "
+                        f"ESS: {diagnostics.get('ess', 'N/A')}",
+                        stacklevel=2,
+                    )
+            else:
                 warnings.warn(
-                    f"MCMC chain may not have converged. R-hat: {diagnostics.get('rhat', 'N/A')}, "
-                    f"ESS: {diagnostics.get('ess', 'N/A')}",
+                    f"Insufficient samples for diagnostics ({min_samples} samples). "
+                    "Skipping convergence checks.",
                     stacklevel=2,
                 )
         except Exception as e:

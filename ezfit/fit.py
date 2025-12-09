@@ -12,6 +12,7 @@ from matplotlib.axes import Axes
 from ezfit.exceptions import ColumnNotFoundError
 from ezfit.model import Model
 from ezfit.optimizers import (  # Import optimizer functions
+    FitResult,
     _fit_bayesian_ridge,
     _fit_curve_fit,
     _fit_differential_evolution,
@@ -134,7 +135,7 @@ class FitAccessor:
         ax = None
         ax_res = None
         if plot:
-            ax, ax_res = self.plot(
+            axes = self.plot(
                 x=x,
                 y=y,
                 model=fitted_model,
@@ -224,7 +225,7 @@ class FitAccessor:
             fit_kwargs = {}
 
         # --- Select and call the appropriate optimizer ---
-        fit_result: FitResult
+        fit_result : FitResult | None = None
 
         try:
             if method == "curve_fit":
@@ -346,11 +347,14 @@ class FitAccessor:
         model_obj.residuals = fit_result["residuals"]
         model_obj.𝜒2 = fit_result["chi2"]
         model_obj.r𝜒2 = fit_result["rchi2"]
-        model_obj.cov = fit_result["cov"]
+        model_obj.cov = fit_result["pcov"]
         model_obj.cor = fit_result["cor"]
         model_obj.fit_result_details = fit_result.get(
             "details"
         )  # Store extra details if present
+        model_obj.sampler_chain = fit_result.get(
+            "sampler_chain"
+        )  # Store MCMC chain if available
 
         # Update model parameters with fitted values and errors
         popt = fit_result["popt"]
@@ -517,6 +521,12 @@ class FitAccessor:
             # Align y-axis labels
             main_ax.yaxis.set_label_coords(-0.1, 0.5)
             res_ax.yaxis.set_label_coords(-0.1, 0.5)
+            # Align x-axis labels
+            fig = main_ax.get_figure()
+            if fig is not None:
+                fig.align_ylabels()
+            else:
+                warnings.warn("Figure is None, cannot align y-axis labels")
 
             return main_ax, res_ax
         else:

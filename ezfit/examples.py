@@ -171,26 +171,72 @@ def generate_multi_peak_data(
 
     return pd.DataFrame({"x": x, "y": y, "yerr": yerr})
 
+def rugged_noise(y_true: np.ndarray, noise_level: float = 0.3, seed: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Add rugged, non-Gaussian noise to a model (mixture of Gaussian bulk and exponential outliers).
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        The true model values (shape [n_points]).
+    noise_level : float
+        Standard deviation for the Gaussian component (base noise level).
+    seed : int or None
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    y : np.ndarray
+        Model with added rugged noise (same shape as y_true).
+    y_true : np.ndarray
+        The true model values (shape [n_points]).
+    noise : np.ndarray
+        The noise values (shape [n_points]).
+    """
+    if seed is not None:
+        np.random.seed(seed)
+    n_points = y_true.size
+
+    n_gaussian = int(0.85 * n_points)  # 85% Gaussian noise
+    n_outliers = n_points - n_gaussian  # 15% outliers
+
+    gaussian_noise = np.random.normal(0, noise_level, n_gaussian)
+    # Exponential noise for outliers (skewed distribution)
+    outlier_noise = np.random.exponential(scale=2.0 * noise_level, size=n_outliers)
+    outlier_noise *= np.random.choice([-1, 1], size=n_outliers)  # Random sign
+
+    # Combine and shuffle
+    noise = np.concatenate([gaussian_noise, outlier_noise])
+    np.random.shuffle(noise)
+
+    y = y_true + noise
+    return y, y_true, noise
 
 def generate_rugged_surface_data(
-    n_points: int = 100,
-    noise_level: float = 0.5,
-    x_range: tuple[float, float] = (0, 10),
+    n_points: int = 200,
+    noise_level: float = 0.3,
+    x_range: tuple[float, float] = (0, 20),
     seed: int | None = None,
+    peaks: list[dict[str, float]] | None = None,
+    small_errorbars: bool = False,
 ) -> pd.DataFrame:
     """Generate data with a rugged, multi-modal objective function surface.
 
-    This creates data that is difficult to fit with simple optimizers,
-    demonstrating the need for global optimization methods like
-    differential_evolution or MCMC.
+    This creates data with multiple peaks on an exponential background with
+    non-Gaussian experimental errors, making it extremely difficult to fit
+    with simple optimizers. Demonstrates the need for global optimization
+    methods like differential_evolution or MCMC.
 
-    The function is: y = sin(x) * exp(-x/5) + 0.5*sin(3*x) + noise
+    The function is: y = A*exp(-x/tau) + sum(peaks) + noise
+    where peaks are Gaussian functions and noise has non-Gaussian distribution.
 
     Args:
         n_points: Number of data points to generate.
-        noise_level: Standard deviation of Gaussian noise.
+        noise_level: Base noise level (actual noise is non-Gaussian).
         x_range: Tuple of (x_min, x_max) for data range.
         seed: Random seed for reproducibility.
+        peaks: List of peak dictionaries with 'amplitude', 'center', 'fwhm'.
+            If None, uses default peaks.
 
     Returns
     -------
@@ -199,12 +245,50 @@ def generate_rugged_surface_data(
     if seed is not None:
         np.random.seed(seed)
 
+    if peaks is None:
+        peaks = [
+            {"amplitude": 5.0, "center": 3.0, "fwhm": 2.5},
+            {"amplitude": 4.0, "center": 7.0, "fwhm": 3.2},
+            {"amplitude": 6.0, "center": 12.0, "fwhm": 4.0},
+            {"amplitude": 3.5, "center": 16.0, "fwhm": 5.8},
+        ]
+
     x = np.linspace(x_range[0], x_range[1], n_points)
-    # Complex function with multiple local minima
-    y_true = np.sin(x) * np.exp(-x / 5) + 0.5 * np.sin(3 * x) + 2.0
-    noise = np.random.normal(0, noise_level, n_points)
-    y = y_true + noise
-    yerr = np.full_like(y, noise_level)
+
+    # Exponential background
+    A_bg = 10
+    tau = 8.0
+    y_true = A_bg * np.exp(-x / tau)
+
+    # Add multiple Gaussian peaks
+    c = 4.0 * np.log(2.0)
+    for peak in peaks:
+        y_true += peak["amplitude"] * np.exp(
+            -c * ((x - peak["center"]) / peak["fwhm"]) ** 2
+        )
+
+    y, y_true, noise = rugged_noise(y_true, noise_level, seed)
+
+    # Add Gaussian background
+    A_bg_gauss = np.mean(y_true)
+    center_bg = np.mean(x)
+    fwhm_bg = np.std(x)
+    y_true += A_bg_gauss * np.exp(
+        -((x - center_bg) / fwhm_bg) ** 2
+    )
+
+    # Add linear background based on the xrange to add a slight slope to the data
+    B_bg = 2* (y_true[x_range[1]] - y_true[x_range[0]]) / (x_range[1] - x_range[0])
+    C_bg = y_true[x_range[0]] - B_bg * x_range[0]
+    y_true += B_bg * x + C_bg
+
+    # Error bars: larger for outliers, smaller for normal points
+    # Use absolute value of noise as base, with some variation
+    yerr = noise_level * (1.0 + 0.5 * np.abs(noise) / noise_level)
+    yerr = np.clip(yerr, 0.1 * noise_level, 5.0 * noise_level)
+    # If the small_errorbars is True, underestimate the errorbars by a factor of 10
+    if small_errorbars:
+        yerr = yerr / 10.0
 
     return pd.DataFrame({"x": x, "y": y, "yerr": yerr})
 
@@ -244,6 +328,15 @@ def generate_exponential_decay_data(
 
     return pd.DataFrame({"x": x, "y": y, "yerr": yerr})
 
+def step_edge(x, c, H):
+    return H * (x > c)
+
+def generate_rugged_step_edge_data(c, H, x_range, n_points, noise_level):
+    x = np.linspace(x_range[0], x_range[1], n_points)
+    y = step_edge(x, c, H)
+    y, _, noise = rugged_noise(y, noise_level)
+    y_err = noise_level * (1.0 + 0.5 * np.abs(noise) / noise_level)
+    return pd.DataFrame({'x': x, 'y': y, 'yerr': y_err})
 
 def generate_oscillatory_data(
     n_points: int = 100,

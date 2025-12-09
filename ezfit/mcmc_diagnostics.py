@@ -27,6 +27,9 @@ def compute_ess(chain: np.ndarray, axis: int = 0) -> float:
     -------
         Effective sample size.
     """
+    if chain is None or chain.size == 0:
+        return 0.0
+
     if chain.ndim == 3:
         # Reshape to (n_samples, n_params) by flattening walkers
         chain = chain.reshape(-1, chain.shape[-1])
@@ -36,6 +39,9 @@ def compute_ess(chain: np.ndarray, axis: int = 0) -> float:
         raise ValueError(msg)
 
     n_samples, n_params = chain.shape
+
+    if n_samples == 0:
+        return 0.0
 
     # Compute ESS for each parameter and return minimum (bottleneck)
     ess_values = []
@@ -94,6 +100,9 @@ def gelman_rubin(chain: np.ndarray) -> float:
     -------
         R-hat statistic (maximum over all parameters).
     """
+    if chain is None or chain.size == 0:
+        return np.nan
+
     if chain.ndim == 2:
         # Assume single chain, can't compute R-hat
         return 1.0
@@ -104,8 +113,8 @@ def gelman_rubin(chain: np.ndarray) -> float:
 
     n_walkers, n_steps, n_params = chain.shape
 
-    if n_walkers < 2:
-        return 1.0  # Need at least 2 chains
+    if n_walkers < 2 or n_steps == 0:
+        return 1.0  # Need at least 2 chains and some steps
 
     # Compute R-hat for each parameter
     rhat_values = []
@@ -154,6 +163,9 @@ def estimate_burnin(
     -------
         Estimated burn-in period (number of samples to discard).
     """
+    if chain is None or chain.size == 0:
+        return 0
+
     if chain.ndim == 3:
         # Use first parameter as proxy, or average over parameters
         chain = chain.reshape(-1, chain.shape[-1])
@@ -163,6 +175,9 @@ def estimate_burnin(
         raise ValueError(msg)
 
     n_samples, n_params = chain.shape
+
+    if n_samples == 0:
+        return 0
 
     if method == "autocorr":
         # Find where autocorrelation drops below threshold
@@ -245,26 +260,86 @@ def check_convergence(
     """
     diagnostics: dict[str, float | int] = {}
 
+    # Validate chain
+    if chain is None or chain.size == 0:
+        diagnostics["rhat"] = np.nan
+        diagnostics["ess"] = 0.0
+        diagnostics["burnin"] = 0
+        diagnostics["n_effective_samples"] = 0
+        diagnostics["converged"] = False
+        return False, diagnostics
+
+    # Check for NaN or Inf values
+    if np.any(~np.isfinite(chain)):
+        # Try to work with finite values only
+        if chain.ndim == 3:
+            finite_mask = np.all(np.isfinite(chain), axis=(0, 2))
+            if np.sum(finite_mask) == 0:
+                diagnostics["rhat"] = np.nan
+                diagnostics["ess"] = 0.0
+                diagnostics["burnin"] = 0
+                diagnostics["n_effective_samples"] = 0
+                diagnostics["converged"] = False
+                return False, diagnostics
+            chain = chain[:, finite_mask, :]
+        else:
+            finite_mask = np.all(np.isfinite(chain), axis=1)
+            if np.sum(finite_mask) == 0:
+                diagnostics["rhat"] = np.nan
+                diagnostics["ess"] = 0.0
+                diagnostics["burnin"] = 0
+                diagnostics["n_effective_samples"] = 0
+                diagnostics["converged"] = False
+                return False, diagnostics
+            chain = chain[finite_mask, :]
+
     # Estimate burn-in if not provided
     if burnin is None:
         burnin = estimate_burnin(chain)
+
+    # Ensure burn-in doesn't remove all samples
+    if chain.ndim == 3:
+        max_burnin = chain.shape[1] - 10  # Keep at least 10 samples
+    else:
+        max_burnin = chain.shape[0] - 10
+    burnin = min(burnin, max_burnin)
+    burnin = max(0, burnin)  # Ensure non-negative
+
     diagnostics["burnin"] = burnin
 
     # Discard burn-in
     if chain.ndim == 3:
         chain_post_burnin = chain[:, burnin:, :]
+        if chain_post_burnin.shape[1] == 0:
+            diagnostics["rhat"] = np.nan
+            diagnostics["ess"] = 0.0
+            diagnostics["n_effective_samples"] = 0
+            diagnostics["converged"] = False
+            return False, diagnostics
     else:
         chain_post_burnin = chain[burnin:, :]
+        if chain_post_burnin.shape[0] == 0:
+            diagnostics["rhat"] = np.nan
+            diagnostics["ess"] = 0.0
+            diagnostics["n_effective_samples"] = 0
+            diagnostics["converged"] = False
+            return False, diagnostics
 
     # Compute R-hat (requires multiple chains)
     if chain.ndim == 3:
-        rhat = gelman_rubin(chain_post_burnin)
+        try:
+            rhat = gelman_rubin(chain_post_burnin)
+        except Exception:
+            rhat = np.nan
     else:
         rhat = 1.0  # Can't compute R-hat for single chain
     diagnostics["rhat"] = rhat
 
     # Compute ESS
-    ess = compute_ess(chain_post_burnin)
+    try:
+        ess = compute_ess(chain_post_burnin)
+    except Exception:
+        ess = 0.0
     diagnostics["ess"] = ess
 
     # Effective number of samples after burn-in
@@ -276,9 +351,9 @@ def check_convergence(
 
     # Check convergence
     converged = True
-    if chain.ndim == 3 and rhat > rhat_threshold:
+    if chain.ndim == 3 and (np.isnan(rhat) or rhat > rhat_threshold):
         converged = False
-    if ess < ess_min:
+    if np.isnan(ess) or ess < ess_min:
         converged = False
 
     diagnostics["converged"] = converged

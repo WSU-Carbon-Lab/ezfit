@@ -115,7 +115,12 @@ class Parameter:
         if self.fixed:
             return f"(value={self.value:.10f}, fixed=True)"
         v, e = rounded_values(self.value, self.err, 2)
-        return f"(value = {v} ± {e}, bounds = ({self.min}, {self.max}))"
+        # Handle NaN/Inf in error display
+        if not np.isfinite(e):
+            e_str = "N/A" if np.isnan(e) else str(e)
+        else:
+            e_str = str(e)
+        return f"(value = {v} ± {e_str}, bounds = ({self.min}, {self.max}))"
 
     def random(self) -> float:
         """Return a valid random value within the bounds."""
@@ -413,11 +418,21 @@ def sig_fig_round(x, n):
     """Round a number to n significant figures."""
     if x == 0:
         return 0
+    if not np.isfinite(x):
+        # Handle NaN and Inf values
+        return x
     return round(x, -int(np.floor(np.log10(abs(x))) - (n - 1)))
 
 
 def rounded_values(x, xerr, n):
     """Round the values and errors to n significant figures."""
     err = sig_fig_round(xerr, n)
-    val = round(x, -int(np.floor(np.log10(err))))
+    if not np.isfinite(err) or err == 0:
+        # Handle NaN, Inf, or zero error - just round the value normally
+        if np.isfinite(x):
+            val = round(x, n)
+        else:
+            val = x
+    else:
+        val = round(x, -int(np.floor(np.log10(err))))
     return val, err
