@@ -300,13 +300,16 @@ def validate_constraints(
 ) -> tuple[bool, str | None]:
     """Validate that constraints are satisfiable with given parameter values.
 
-    Args:
-        model: Model with parameters and constraints.
-        initial_values: Initial parameter values to test.
-            If None, uses parameter values.
+    Parameters
+    ----------
+    model : Model
+        Model with parameters and constraints.
+    initial_values : dict[str, float] | None, optional
+        Initial parameter values to test. If None, uses parameter values.
 
     Returns
     -------
+    tuple[bool, str | None]
         Tuple of (is_valid, error_message).
         is_valid is True if constraints are satisfiable.
     """

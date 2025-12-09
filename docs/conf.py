@@ -28,7 +28,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx_copybutton",
-    "myst_nb",  # For Jupyter notebook support
+    "myst_nb",  # For Jupyter notebook support (includes myst_parser)
     "sphinx_design",
 ]
 
