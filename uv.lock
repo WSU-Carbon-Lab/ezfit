@@ -635,6 +635,9 @@ notebook = [
 ]
 
 [package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
 mcmc = [
     { name = "tqdm" },
 ]
@@ -673,6 +676,7 @@ requires-dist = [
 provides-extras = ["all", "mcmc", "docs", "dev", "notebook"]
 
 [package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.14.8" }]
 mcmc = [{ name = "tqdm", specifier = ">=4.67.1" }]
 
 [[package]]

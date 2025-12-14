@@ -200,11 +200,12 @@ def pseudo_voigt(x, height, center, fwhm, eta):
 
     The function is defined as::
 
-        y = height * [ (1 - eta) * G + eta * L ]
+        y = height * [(1 - eta) * G + eta * L]
 
     where G is a normalized Gaussian and L is a normalized Lorentzian, both
     with the same FWHM and center position. The mixing parameter eta controls
-    the relative contribution of each component (0 = pure Gaussian, 1 = pure Lorentzian).
+    the relative contribution of each component
+    (0 = pure Gaussian, 1 = pure Lorentzian).
 
     Parameters
     ----------
@@ -257,8 +258,11 @@ def pseudo_voigt(x, height, center, fwhm, eta):
 def linear(x, m, b):
     """Linear function.
 
-    Computes a linear relationship of the form y = m * x + b, where m is the
-    slope and b is the y-intercept.
+    The function is defined as::
+
+        y = m * x + b
+
+    where m is the slope and b is the y-intercept.
 
     Parameters
     ----------

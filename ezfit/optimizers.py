@@ -1,11 +1,23 @@
-"""
-Optimization routines for ezfit, wrapping scipy.optimize and emcee.
+"""Optimization routines module for ezfit.
+
+This module provides low-level optimization functions that wrap scipy.optimize
+and emcee. These functions are called internally by FitAccessor.fit() via a
+registry pattern and should not be called directly by users.
+
+Features
+--------
+- Multiple optimization algorithms (curve_fit, minimize, etc.)
+- Global optimizers (differential_evolution, shgo, dual_annealing)
+- MCMC sampling via emcee with automatic diagnostics
+- Regularized regression via scikit-learn (Ridge, Lasso, ElasticNet)
+- Automatic covariance matrix estimation for all methods
+- Constraint handling for parameter relationships
 """
 
 import warnings
 from typing import TYPE_CHECKING, Any
 
-import emcee
+import emcee  # type: ignore[import-untyped]
 import numpy as np
 from scipy.optimize import (
     OptimizeResult,
@@ -18,6 +30,9 @@ from scipy.optimize import (
 )
 
 if TYPE_CHECKING:
+    from scipy.optimize import (
+        NonlinearConstraint,
+    )
     from sklearn.linear_model import (
         BayesianRidge,
         ElasticNet,
@@ -26,6 +41,10 @@ if TYPE_CHECKING:
         Ridge,
     )
     from sklearn.preprocessing import PolynomialFeatures
+
+    from ezfit.types import (
+        BayesianRidgeKwargs,
+    )
 else:
     try:
         from sklearn.linear_model import (
@@ -48,7 +67,6 @@ from ezfit.constraints import extract_constraints_from_model
 from ezfit.mcmc_diagnostics import check_convergence, estimate_burnin
 from ezfit.model import Model
 from ezfit.types import (
-    BayesianRidgeKwargs,
     CurveFitKwargs,
     DifferentialEvolutionKwargs,
     DualAnnealingKwargs,
@@ -68,7 +86,32 @@ def _calculate_fit_stats(
     popt: np.ndarray,
     pcov: np.ndarray | None,
 ) -> tuple[np.ndarray, float | None, float | None, np.ndarray | None]:
-    """Calculate residuals, chi-squared, reduced chi-squared, and correlation matrix."""
+    """Calculate residuals, chi-squared, reduced chi-squared, and correlation matrix.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable, or None if not provided.
+    popt : np.ndarray
+        Optimized parameter values.
+    pcov : np.ndarray | None
+        Covariance matrix, or None if not available.
+
+    Returns
+    -------
+    tuple[np.ndarray, float | None, float | None, np.ndarray | None]
+        Tuple of (residuals, chi2, rchi2, cor).
+        residuals: Array of residuals (ydata - model).
+        chi2: Chi-squared statistic, or None if cannot compute.
+        rchi2: Reduced chi-squared, or None if cannot compute.
+        cor: Correlation matrix, or None if cannot compute.
+    """
     residuals = ydata - model.func(xdata, *popt)
     chi2: float = np.inf
     rchi2: float = np.inf
@@ -116,7 +159,26 @@ def _fit_curve_fit(
     sigma: np.ndarray | None,
     fit_kwargs: CurveFitKwargs,
 ) -> FitResult:
-    """Perform fitting using `scipy.optimize.curve_fit`."""
+    """Perform fitting using `scipy.optimize.curve_fit`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable, or None if not provided.
+    fit_kwargs : CurveFitKwargs
+        Keyword arguments for scipy.optimize.curve_fit.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+    """
     p0 = model.values()
     bounds_tuple = model.bounds()
     absolute_sigma = sigma is not None
@@ -189,7 +251,26 @@ def _fit_minimize(
     sigma: np.ndarray,
     fit_kwargs: MinimizeKwargs,
 ) -> FitResult:
-    """Perform fitting using `scipy.optimize.minimize`."""
+    """Perform fitting using `scipy.optimize.minimize`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray
+        Error on dependent variable (required for this method).
+    fit_kwargs : MinimizeKwargs
+        Keyword arguments for scipy.optimize.minimize.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+    """
     p0 = model.values()
     bounds_tuple = model.bounds()
     bounds_list = list(zip(bounds_tuple[0], bounds_tuple[1], strict=False))
@@ -201,13 +282,18 @@ def _fit_minimize(
 
     # Extract constraints from model parameters
     constraint_funcs = extract_constraints_from_model(model)
+
+    # Get user-provided constraints, default to empty list if not provided
     constraints_list = fit_kwargs.get("constraints", [])
+    # Ensure constraints_list is a list (not a dict or None)
+    if not isinstance(constraints_list, list):
+        constraints_list: list[NonlinearConstraint] = (
+            [constraints_list] if constraints_list is not None else []
+        )
 
     # Convert constraint functions to scipy constraints if needed
     if constraint_funcs:
         from scipy.optimize import NonlinearConstraint
-
-        param_names = list(model.params.keys()) if model.params else []
 
         for constraint_func in constraint_funcs:
             # Create NonlinearConstraint from constraint function
@@ -297,7 +383,26 @@ def _fit_differential_evolution(
     sigma: np.ndarray,
     fit_kwargs: DifferentialEvolutionKwargs,
 ) -> FitResult:
-    """Perform fitting using `scipy.optimize.differential_evolution`."""
+    """Perform fitting using `scipy.optimize.differential_evolution`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray
+        Error on dependent variable (required for this method).
+    fit_kwargs : DifferentialEvolutionKwargs
+        Keyword arguments for scipy.optimize.differential_evolution.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+    """
     bounds_tuple = model.bounds()
     bounds_list = list(zip(bounds_tuple[0], bounds_tuple[1], strict=False))
     p0 = model.values()
@@ -425,7 +530,26 @@ def _fit_shgo(
     sigma: np.ndarray,
     fit_kwargs: ShgoKwargs,
 ) -> FitResult:
-    """Perform fitting using scipy.optimize.shgo."""
+    """Perform fitting using scipy.optimize.shgo.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray
+        Error on dependent variable (required for this method).
+    fit_kwargs : ShgoKwargs
+        Keyword arguments for scipy.optimize.shgo.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+    """
     bounds_tuple = model.bounds()
     bounds_list = list(zip(bounds_tuple[0], bounds_tuple[1], strict=False))
     p0 = model.values()
@@ -477,7 +601,26 @@ def _fit_dual_annealing(
     sigma: np.ndarray,
     fit_kwargs: DualAnnealingKwargs,
 ) -> FitResult:
-    """Perform fitting using `scipy.optimize.dual_annealing`."""
+    """Perform fitting using `scipy.optimize.dual_annealing`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray
+        Error on dependent variable (required for this method).
+    fit_kwargs : DualAnnealingKwargs
+        Keyword arguments for scipy.optimize.dual_annealing.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+    """
     bounds_tuple = model.bounds()
     bounds_list = list(zip(bounds_tuple[0], bounds_tuple[1], strict=False))
     p0 = model.values()
@@ -535,21 +678,30 @@ def _fit_bayesian_ridge(
     parameters). The function signature is analyzed to determine if the model
     is linear.
 
-    Args:
-        model: The model function to fit. Must be linear in parameters.
-        xdata: Independent variable data.
-        ydata: Dependent variable data.
-        sigma: Error on dependent variable (used for weighting if provided).
-        fit_kwargs: Keyword arguments for BayesianRidge.
+    Parameters
+    ----------
+    model : Model
+        The model function to fit. Must be linear in parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable (used for weighting if provided).
+    fit_kwargs : BayesianRidgeKwargs
+        Keyword arguments for sklearn.linear_model.BayesianRidge.
 
     Returns
     -------
+    FitResult
         FitResult with fitted parameters and statistics.
 
     Raises
     ------
-        ImportError: If scikit-learn is not installed.
-        ValueError: If model is not linear in parameters.
+    ImportError
+        If scikit-learn is not installed.
+    ValueError
+        If model is not linear in parameters or has no parameters.
     """
     if BayesianRidge is None:
         msg = "scikit-learn is required for Bayesian Ridge fitting. Install with: pip install scikit-learn"
@@ -607,7 +759,9 @@ def _fit_bayesian_ridge(
     try:
         br_model.fit(design_matrix, ydata, sample_weight=sample_weight)
     except Exception as e:
-        msg = f"Bayesian Ridge fitting failed. Model may not be linear in parameters: {e}"
+        msg = (
+            f"Bayesian Ridge fitting failed. Model may not be linear in parameters: {e}"
+        )
         raise ValueError(msg) from e
 
     # Extract fitted parameters
@@ -668,7 +822,9 @@ def _fit_bayesian_ridge(
         "model": br_model,
         "alpha_": br_model.alpha_ if hasattr(br_model, "alpha_") else None,  # type: ignore
         "lambda_": br_model.lambda_ if hasattr(br_model, "lambda_") else None,  # type: ignore
-        "score": br_model.score(design_matrix, ydata) if hasattr(br_model, "score") else None,  # type: ignore
+        "score": br_model.score(design_matrix, ydata)
+        if hasattr(br_model, "score")
+        else None,  # type: ignore
     }
 
     return FitResult(
@@ -691,7 +847,33 @@ def _fit_ridge(
     sigma: np.ndarray | None,
     fit_kwargs: dict[str, Any],
 ) -> FitResult:
-    """Perform fitting using `sklearn.linear_model.Ridge`."""
+    """Perform fitting using `sklearn.linear_model.Ridge`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable (used for weighting if provided).
+    fit_kwargs : dict[str, Any]
+        Keyword arguments for sklearn.linear_model.Ridge.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+
+    Raises
+    ------
+    ImportError
+        If scikit-learn is not installed.
+    ValueError
+        If fitting fails.
+    """
     if Ridge is None:
         msg = "scikit-learn is required for Ridge fitting. Install with: pip install scikit-learn"
         raise ImportError(msg)
@@ -750,7 +932,33 @@ def _fit_lasso(
     sigma: np.ndarray | None,
     fit_kwargs: dict[str, Any],
 ) -> FitResult:
-    """Perform fitting using `sklearn.linear_model.Lasso`."""
+    """Perform fitting using `sklearn.linear_model.Lasso`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable (used for weighting if provided).
+    fit_kwargs : dict[str, Any]
+        Keyword arguments for sklearn.linear_model.Lasso.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+
+    Raises
+    ------
+    ImportError
+        If scikit-learn is not installed.
+    ValueError
+        If fitting fails.
+    """
     if Lasso is None:
         msg = "scikit-learn is required for Lasso fitting. Install with: pip install scikit-learn"
         raise ImportError(msg)
@@ -807,7 +1015,33 @@ def _fit_elasticnet(
     sigma: np.ndarray | None,
     fit_kwargs: dict[str, Any],
 ) -> FitResult:
-    """Perform fitting using `sklearn.linear_model.ElasticNet`."""
+    """Perform fitting using `sklearn.linear_model.ElasticNet`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable (used for weighting if provided).
+    fit_kwargs : dict[str, Any]
+        Keyword arguments for sklearn.linear_model.ElasticNet.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+
+    Raises
+    ------
+    ImportError
+        If scikit-learn is not installed.
+    ValueError
+        If fitting fails.
+    """
     if ElasticNet is None:
         msg = "scikit-learn is required for ElasticNet fitting. Install with: pip install scikit-learn"
         raise ImportError(msg)
@@ -868,7 +1102,34 @@ def _fit_polynomial(
     sigma: np.ndarray | None,
     fit_kwargs: dict[str, Any],
 ) -> FitResult:
-    """Perform polynomial fitting using sklearn."""
+    """Perform polynomial fitting using sklearn.
+
+    Parameters
+    ----------
+    model : Model
+        The model object (function is used for signature only).
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray | None
+        Error on dependent variable (used for weighting if provided).
+    fit_kwargs : dict[str, Any]
+        Keyword arguments including 'degree' for polynomial degree.
+        Other kwargs passed to sklearn.linear_model.LinearRegression.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters and statistics.
+
+    Raises
+    ------
+    ImportError
+        If scikit-learn is not installed.
+    ValueError
+        If fitting fails.
+    """
     if LinearRegression is None or PolynomialFeatures is None:
         msg = "scikit-learn is required for polynomial fitting. Install with: pip install scikit-learn"
         raise ImportError(msg)
@@ -932,7 +1193,35 @@ def _fit_emcee(
     sigma: np.ndarray,
     fit_kwargs: EmceeKwargs,
 ) -> FitResult:
-    """Perform MCMC fitting using `emcee`."""
+    """Perform MCMC fitting using `emcee`.
+
+    Parameters
+    ----------
+    model : Model
+        The model object containing the function and parameters.
+    xdata : np.ndarray
+        Independent variable data.
+    ydata : np.ndarray
+        Dependent variable data.
+    sigma : np.ndarray
+        Error on dependent variable (required for this method).
+    fit_kwargs : EmceeKwargs
+        Keyword arguments for emcee.EnsembleSampler and run_mcmc.
+        Required: 'nwalkers', 'nsteps'.
+
+    Returns
+    -------
+    FitResult
+        FitResult dictionary with optimized parameters, statistics, and
+        MCMC chain for further analysis.
+
+    Raises
+    ------
+    ImportError
+        If emcee is not installed.
+    ValueError
+        If required arguments (nwalkers, nsteps) are missing or fitting fails.
+    """
     if np.any(sigma <= 0):
         msg = (
             "Non-positive values found in yerr (sigma). "
@@ -1040,7 +1329,8 @@ def _fit_emcee(
 
     # Get full chain for diagnostics
     try:
-        full_chain = sampler.get_chain()  # Shape: (nsteps, nwalkers, ndim)
+        # emcee.get_chain() returns shape (nwalkers, nsteps, ndim)
+        full_chain = sampler.get_chain()
     except Exception as e:
         warnings.warn(f"Could not retrieve chain from sampler: {e}", stacklevel=2)
         full_chain = None
@@ -1093,13 +1383,14 @@ def _fit_emcee(
             # Check if chain has valid (finite) values
             if np.all(~np.isfinite(chain)):
                 warnings.warn(
-                    "MCMC chain contains only NaN/Inf values. "
-                    "Sampler may have failed.",
+                    "MCMC chain contains only NaN/Inf values. Sampler may have failed.",
                     stacklevel=2,
                 )
                 chain = None
     except Exception as e:
-        warnings.warn(f"Could not retrieve processed chain from sampler: {e}", stacklevel=2)
+        warnings.warn(
+            f"Could not retrieve processed chain from sampler: {e}", stacklevel=2
+        )
         chain = None
 
     # Store full chain for diagnostics if available
@@ -1117,14 +1408,16 @@ def _fit_emcee(
 
             if min_samples > 10:  # Need at least 10 samples
                 converged, diagnostics = check_convergence(
-                    chain_for_diagnostics, burnin=discard if full_chain is not None else None
+                    chain_for_diagnostics,
+                    burnin=discard if full_chain is not None else None,
                 )
                 if not converged:
-                    warnings.warn(
-                        f"MCMC chain may not have converged. R-hat: {diagnostics.get('rhat', 'N/A')}, "
-                        f"ESS: {diagnostics.get('ess', 'N/A')}",
-                        stacklevel=2,
+                    rhat = diagnostics.get("rhat", "N/A")
+                    ess = diagnostics.get("ess", "N/A")
+                    msg = (
+                        f"MCMC chain may not have converged. R-hat: {rhat}, ESS: {ess}"
                     )
+                    warnings.warn(msg, stacklevel=2)
             else:
                 warnings.warn(
                     f"Insufficient samples for diagnostics ({min_samples} samples). "
@@ -1132,7 +1425,9 @@ def _fit_emcee(
                     stacklevel=2,
                 )
         except Exception as e:
-            warnings.warn(f"Could not compute convergence diagnostics: {e}", stacklevel=2)
+            warnings.warn(
+                f"Could not compute convergence diagnostics: {e}", stacklevel=2
+            )
 
     popt = np.full(ndim, np.nan)
     perr = np.full(ndim, np.nan)

@@ -1,9 +1,21 @@
-"""MCMC diagnostics and convergence analysis tools.
+"""MCMC diagnostics and convergence analysis module for ezfit.
 
-This module provides functions for analyzing MCMC chains, checking convergence,
-and computing diagnostic statistics like effective sample size and Gelman-Rubin statistic.
+This module provides comprehensive tools for analyzing MCMC chains, checking
+convergence, and computing diagnostic statistics. These functions are used
+internally by the emcee fitting method to ensure reliable parameter estimation.
+
+Features
+--------
+- Effective Sample Size (ESS) computation using autocorrelation analysis
+- Gelman-Rubin R-hat statistic for convergence assessment
+- Automatic burn-in period estimation using multiple methods
+- Comprehensive convergence diagnostics combining multiple metrics
+- Integration with arviz for advanced statistical analysis
+
+The functions in this module operate on MCMC chains in various formats:
+- 2D arrays: (n_samples, n_params) for flattened chains
+- 3D arrays: (n_walkers, n_steps, n_params) for multi-walker chains
 """
-
 
 import numpy as np
 
@@ -19,13 +31,19 @@ def compute_ess(chain: np.ndarray, axis: int = 0) -> float:
     The ESS estimates how many independent samples the chain represents.
     Higher ESS indicates better mixing and more reliable estimates.
 
-    Args:
-        chain: MCMC chain array of shape (n_samples, n_params) or (n_walkers, n_steps, n_params).
-        axis: Axis along which to compute ESS (0 for samples, 1 for walkers if 3D).
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_samples, n_params) or
+        (n_walkers, n_steps, n_params).
+    axis : int, optional
+        Axis along which to compute ESS (currently unused, reserved for future use),
+        by default 0.
 
     Returns
     -------
-        Effective sample size.
+    float
+        Effective sample size (minimum across all parameters).
     """
     if chain is None or chain.size == 0:
         return 0.0
@@ -77,7 +95,7 @@ def compute_ess(chain: np.ndarray, axis: int = 0) -> float:
                 break
         else:
             # If we didn't find a drop, estimate from integrated autocorrelation
-            tau = 1.0 + 2.0 * np.sum(np.abs(autocorr[1:min(n // 2, 100)]))
+            tau = 1.0 + 2.0 * np.sum(np.abs(autocorr[1 : min(n // 2, 100)]))
 
         # ESS = n / (1 + 2 * tau)
         ess = n / (1.0 + 2.0 * tau)
@@ -90,15 +108,21 @@ def gelman_rubin(chain: np.ndarray) -> float:
     """Compute Gelman-Rubin R-hat statistic for MCMC convergence.
 
     R-hat measures convergence by comparing within-chain and between-chain variance.
-    Values close to 1.0 indicate good convergence. Values > 1.1 suggest lack of convergence.
+    Values close to 1.0 indicate good convergence. Values > 1.1 suggest lack of
+    convergence.
 
-    Args:
-        chain: MCMC chain array of shape (n_walkers, n_steps, n_params) or
-               (n_samples, n_params) if already flattened.
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_walkers, n_steps, n_params) or
+        (n_samples, n_params) if already flattened. For 2D chains, returns 1.0
+        (cannot compute R-hat without multiple chains).
 
     Returns
     -------
-        R-hat statistic (maximum over all parameters).
+    float
+        R-hat statistic (maximum over all parameters). Returns 1.0 for single chains
+        or np.nan for invalid chains.
     """
     if chain is None or chain.size == 0:
         return np.nan
@@ -129,9 +153,7 @@ def gelman_rubin(chain: np.ndarray) -> float:
 
         # Between-chain variance (B)
         overall_mean = np.mean(param_chains)
-        B = (n_steps / (n_walkers - 1.0)) * np.sum(
-            (chain_means - overall_mean) ** 2
-        )
+        B = (n_steps / (n_walkers - 1.0)) * np.sum((chain_means - overall_mean) ** 2)
 
         # Pooled variance estimate
         var_hat = ((n_steps - 1) / n_steps) * W + (1 / n_steps) * B
@@ -152,16 +174,26 @@ def estimate_burnin(
 ) -> int:
     """Estimate burn-in period for MCMC chain.
 
-    Args:
-        chain: MCMC chain array of shape (n_samples, n_params) or
-               (n_walkers, n_steps, n_params).
-        method: Method to use: "autocorr" (autocorrelation), "rolling" (rolling mean),
-                or "integrated" (integrated autocorrelation time).
-        threshold: Threshold for convergence (for autocorr method).
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_samples, n_params) or
+        (n_walkers, n_steps, n_params).
+    method : str, optional
+        Method to use: "autocorr" (autocorrelation), "rolling" (rolling mean),
+        or "integrated" (integrated autocorrelation time), by default "autocorr".
+    threshold : float, optional
+        Threshold for convergence (for autocorr method), by default 0.05.
 
     Returns
     -------
+    int
         Estimated burn-in period (number of samples to discard).
+
+    Raises
+    ------
+    ValueError
+        If method is unknown or chain shape is invalid.
     """
     if chain is None or chain.size == 0:
         return 0
@@ -222,8 +254,14 @@ def estimate_burnin(
         # Use integrated autocorrelation time
         if az is not None:
             try:
-                # Use arviz for better estimate
-                tau = az.ess(chain[:, 0])
+                # Compute ESS and convert to autocorrelation time
+                # arviz.ess returns effective sample size
+                ess = az.ess(chain[:, 0])  # type: ignore[attr-defined]
+                # Convert ESS to autocorrelation time: tau = n / ESS
+                if ess > 0:
+                    tau = n_samples / ess
+                else:
+                    tau = n_samples / 4  # Fallback if ESS is invalid
                 burnin = int(5 * tau)  # Conservative: 5x autocorrelation time
                 return min(burnin, n_samples // 2)
             except Exception:
@@ -245,18 +283,28 @@ def check_convergence(
 ) -> tuple[bool, dict[str, float | int]]:
     """Check MCMC chain convergence using multiple diagnostics.
 
-    Args:
-        chain: MCMC chain array of shape (n_walkers, n_steps, n_params) or
-               (n_samples, n_params).
-        rhat_threshold: Maximum R-hat value for convergence (default 1.1).
-        ess_min: Minimum effective sample size for convergence.
-        burnin: Burn-in period to discard. If None, estimated automatically.
+    Combines R-hat statistic and Effective Sample Size (ESS) to determine
+    if an MCMC chain has converged. Automatically handles burn-in estimation
+    and filters invalid samples.
+
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_walkers, n_steps, n_params) or
+        (n_samples, n_params).
+    rhat_threshold : float, optional
+        Maximum R-hat value for convergence, by default 1.1.
+    ess_min : float, optional
+        Minimum effective sample size for convergence, by default 100.0.
+    burnin : int | None, optional
+        Burn-in period to discard. If None, estimated automatically, by default None.
 
     Returns
     -------
+    tuple[bool, dict[str, float | int]]
         Tuple of (converged, diagnostics_dict).
         converged is True if all diagnostics indicate convergence.
-        diagnostics_dict contains: rhat, ess, burnin, n_effective_samples.
+        diagnostics_dict contains: rhat, ess, burnin, n_effective_samples, converged.
     """
     diagnostics: dict[str, float | int] = {}
 

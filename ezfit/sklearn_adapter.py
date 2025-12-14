@@ -1,7 +1,15 @@
-"""Adapter layer for scikit-learn integration.
+"""Adapter layer for scikit-learn integration module for ezfit.
 
 This module provides utilities for converting function-based models to
-sklearn-compatible format and detecting linear models.
+sklearn-compatible format. It enables the use of scikit-learn's regularized
+regression methods (Ridge, Lasso, ElasticNet, BayesianRidge) with ezfit's
+function-based model interface.
+
+Features
+--------
+- Design matrix construction for linear models using finite differences
+- Polynomial feature conversion for polynomial regression
+- Linear model detection heuristics (experimental)
 """
 
 import inspect
@@ -45,10 +53,14 @@ class SklearnModelWrapper:
     ) -> None:
         """Initialize the wrapper.
 
-        Args:
-            estimator: sklearn estimator instance.
-            feature_matrix: Design matrix (n_samples, n_features).
-            param_names: List of parameter names corresponding to features.
+        Parameters
+        ----------
+        estimator : BaseEstimator
+            sklearn estimator instance.
+        feature_matrix : np.ndarray
+            Design matrix of shape (n_samples, n_features).
+        param_names : list[str]
+            List of parameter names corresponding to features.
         """
         self.estimator = estimator
         self.feature_matrix = feature_matrix
@@ -57,11 +69,14 @@ class SklearnModelWrapper:
     def predict(self, x: np.ndarray) -> np.ndarray:
         """Predict using the wrapped estimator.
 
-        Args:
-            x: Input data (n_samples,).
+        Parameters
+        ----------
+        x : np.ndarray
+            Input data of shape (n_samples,).
 
         Returns
         -------
+        np.ndarray
             Predicted values.
         """
         # For sklearn, we need to construct the feature matrix for new x values
@@ -76,11 +91,14 @@ def is_linear_model(func: "Callable") -> bool:
     This is a heuristic check - it's not always possible to determine this
     statically.
 
-    Args:
-        func: Function to check.
+    Parameters
+    ----------
+    func : Callable
+        Function to check.
 
     Returns
     -------
+    bool
         True if function appears to be linear in parameters, False otherwise.
     """
     # Get function signature
@@ -133,15 +151,22 @@ def construct_design_matrix(
     For a linear model f(x, a, b, c, ...), the design matrix has columns
     corresponding to partial derivatives with respect to each parameter.
 
-    Args:
-        func: Model function.
-        xdata: Independent variable data.
-        param_names: List of parameter names.
-        p0: Initial parameter values.
-        eps: Step size for finite differences.
+    Parameters
+    ----------
+    func : Callable
+        Model function.
+    xdata : np.ndarray
+        Independent variable data.
+    param_names : list[str]
+        List of parameter names.
+    p0 : list[float]
+        Initial parameter values.
+    eps : float, optional
+        Step size for finite differences, by default 1e-6.
 
     Returns
     -------
+    np.ndarray
         Design matrix of shape (n_samples, n_params).
     """
     n_samples = len(xdata)
@@ -169,14 +194,24 @@ def convert_to_polynomial_model(
     This is useful for polynomial regression where we want to fit
     y = a0 + a1*x + a2*x^2 + ...
 
-    Args:
-        func: Model function (may be ignored if using polynomial features directly).
-        xdata: Independent variable data.
-        degree: Polynomial degree.
+    Parameters
+    ----------
+    func : Callable
+        Model function (may be ignored if using polynomial features directly).
+    xdata : np.ndarray
+        Independent variable data.
+    degree : int, optional
+        Polynomial degree, by default 2.
 
     Returns
     -------
+    tuple[np.ndarray, PolynomialFeatures | None]
         Tuple of (feature_matrix, PolynomialFeatures transformer).
+
+    Raises
+    ------
+    ImportError
+        If sklearn.preprocessing.PolynomialFeatures is not available.
     """
     if PolynomialFeatures is None:
         msg = "sklearn.preprocessing.PolynomialFeatures is required."

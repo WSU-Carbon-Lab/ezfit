@@ -1,7 +1,16 @@
-"""Visualization tools for MCMC chains and fit results.
+"""Visualization tools module for MCMC chains and fit results.
 
-This module provides functions for creating corner plots, trace plots,
-and posterior distribution visualizations.
+This module provides specialized plotting functions for visualizing MCMC chains,
+posterior distributions, and convergence diagnostics. These functions are designed
+to work seamlessly with ezfit's Model class and can also be used standalone.
+
+Features
+--------
+- Corner plots for posterior distributions and parameter correlations
+- Trace plots for chain convergence visualization
+- Posterior distribution histograms with percentile markers
+- Arviz integration for advanced MCMC diagnostics
+- Support for both 2D and 3D chain formats
 """
 
 from typing import TYPE_CHECKING, Any
@@ -31,20 +40,31 @@ def plot_corner(
 ) -> tuple["Figure", np.ndarray]:
     """Create a corner plot from MCMC chain.
 
-    Args:
-        chain: MCMC chain array of shape (n_samples, n_params) or
-               (n_walkers, n_steps, n_params).
-        param_names: List of parameter names for labels. If None, uses "param0", "param1", etc.
-        fig: Existing matplotlib Figure to plot on. If None, creates new figure.
-        **kwargs: Additional keyword arguments passed to corner.corner().
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_samples, n_params) or
+        (n_walkers, n_steps, n_params).
+    param_names : list[str] | None, optional
+        List of parameter names for labels. If None, uses "param0", "param1", etc.,
+        by default None.
+    fig : Figure | None, optional
+        Existing matplotlib Figure to plot on. If None, creates new figure,
+        by default None.
+    **kwargs : dict[str, Any]
+        Additional keyword arguments passed to corner.corner().
 
     Returns
     -------
+    tuple[Figure, np.ndarray]
         Tuple of (figure, axes_array).
 
     Raises
     ------
-        ImportError: If corner package is not installed.
+    ImportError
+        If corner package is not installed.
+    ValueError
+        If chain shape is invalid or param_names length doesn't match chain dimensions.
     """
     if corner is None:
         msg = (
@@ -96,16 +116,29 @@ def plot_trace(
 ) -> tuple["Figure", np.ndarray]:
     """Create trace plots for MCMC chain.
 
-    Args:
-        chain: MCMC chain array of shape (n_walkers, n_steps, n_params) or
-               (n_samples, n_params).
-        param_names: List of parameter names for labels. If None, uses "param0", "param1", etc.
-        fig: Existing matplotlib Figure to plot on. If None, creates new figure.
-        axes: Existing axes array to plot on. If None, creates new axes.
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_walkers, n_steps, n_params) or
+        (n_samples, n_params).
+    param_names : list[str] | None, optional
+        List of parameter names for labels. If None, uses "param0", "param1", etc.,
+        by default None.
+    fig : Figure | None, optional
+        Existing matplotlib Figure to plot on. If None, creates new figure,
+        by default None.
+    axes : np.ndarray | None, optional
+        Existing axes array to plot on. If None, creates new axes, by default None.
 
     Returns
     -------
+    tuple[Figure, np.ndarray]
         Tuple of (figure, axes_array).
+
+    Raises
+    ------
+    ValueError
+        If chain shape is invalid or param_names length doesn't match chain dimensions.
     """
     # Handle different chain shapes
     if chain.ndim == 3:
@@ -167,17 +200,31 @@ def plot_posterior(
 ) -> tuple["Figure", np.ndarray]:
     """Create posterior distribution plots for MCMC chain.
 
-    Args:
-        chain: MCMC chain array of shape (n_samples, n_params) or
-               (n_walkers, n_steps, n_params).
-        param_names: List of parameter names for labels. If None, uses "param0", "param1", etc.
-        fig: Existing matplotlib Figure to plot on. If None, creates new figure.
-        axes: Existing axes array to plot on. If None, creates new axes.
-        bins: Number of bins for histograms.
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_samples, n_params) or
+        (n_walkers, n_steps, n_params).
+    param_names : list[str] | None, optional
+        List of parameter names for labels. If None, uses "param0", "param1", etc.,
+        by default None.
+    fig : Figure | None, optional
+        Existing matplotlib Figure to plot on. If None, creates new figure,
+        by default None.
+    axes : np.ndarray | None, optional
+        Existing axes array to plot on. If None, creates new axes, by default None.
+    bins : int, optional
+        Number of bins for histograms, by default 50.
 
     Returns
     -------
+    tuple[Figure, np.ndarray]
         Tuple of (figure, axes_array).
+
+    Raises
+    ------
+    ValueError
+        If chain shape is invalid or param_names length doesn't match chain dimensions.
     """
     # Flatten chain if 3D
     if chain.ndim == 3:
@@ -217,8 +264,12 @@ def plot_posterior(
 
         # Add percentiles
         percentiles = np.percentile(param_samples, [16, 50, 84])
-        ax.axvline(percentiles[1], color="red", linestyle="--", linewidth=2, label="Median")
-        ax.axvline(percentiles[0], color="red", linestyle=":", linewidth=1, label="16th/84th")
+        ax.axvline(
+            percentiles[1], color="red", linestyle="--", linewidth=2, label="Median"
+        )
+        ax.axvline(
+            percentiles[0], color="red", linestyle=":", linewidth=1, label="16th/84th"
+        )
         ax.axvline(percentiles[2], color="red", linestyle=":", linewidth=1)
 
         ax.set_xlabel(param_name)
@@ -245,14 +296,20 @@ def plot_arviz_summary(
 
     This function uses arviz for advanced MCMC diagnostics and visualization.
 
-    Args:
-        chain: MCMC chain array of shape (n_walkers, n_steps, n_params) or
-               (n_samples, n_params).
-        param_names: List of parameter names for labels. If None, uses "param0", "param1", etc.
-        **kwargs: Additional keyword arguments passed to arviz plotting functions.
+    Parameters
+    ----------
+    chain : np.ndarray
+        MCMC chain array of shape (n_walkers, n_steps, n_params) or
+        (n_samples, n_params).
+    param_names : list[str] | None, optional
+        List of parameter names for labels. If None, uses "param0", "param1", etc.,
+        by default None.
+    **kwargs : dict[str, Any]
+        Additional keyword arguments passed to arviz plotting functions.
 
     Returns
     -------
+    Figure | None
         matplotlib Figure if arviz is available, None otherwise.
     """
     if az is None:

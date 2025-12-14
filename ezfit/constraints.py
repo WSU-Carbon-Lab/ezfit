@@ -154,7 +154,9 @@ def product_equals(
     -------
         Constraint function that returns True if product ≈ value.
     """
-    return lambda p: abs(np.prod([p[param] for param in params]) - value) < tolerance
+    return lambda p: bool(
+        abs(np.prod([p[param] for param in params]) - value) < tolerance
+    )
 
 
 def parse_constraint_string(

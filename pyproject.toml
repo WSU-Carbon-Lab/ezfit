@@ -18,11 +18,11 @@ version = "0.5.3"
 
 [project.optional-dependencies]
 all = [
-    "numpy>=1.26.0,<2.0.0",
-    "pandas>=2.2.2",
-    "scipy>=1.13.0",
-    "matplotlib>=3.10.0",
-    "numba>=0.60.0",
+  "numpy>=1.26.0,<2.0.0",
+  "pandas>=2.2.2",
+  "scipy>=1.13.0",
+  "matplotlib>=3.10.0",
+  "numba>=0.60.0",
 ]
 mcmc = ["emcee>=3.1.0", "corner", "arviz>=0.18.0", "tqdm>=4.67.1"]
 docs = [
@@ -36,7 +36,7 @@ docs = [
   "ipykernel>=6.25.0",
 ]
 dev = [
-  "ruff",
+  "ruff>=0.14.8",
   "mypy",
   "scipy-stubs",
 ]
@@ -127,6 +127,9 @@ module = [
 ignore_missing_imports = true
 
 [dependency-groups]
+dev = [
+    "ruff>=0.14.8",
+]
 mcmc = [
     "tqdm>=4.67.1",
 ]

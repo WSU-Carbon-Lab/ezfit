@@ -1,10 +1,24 @@
-"""Modeling functions and parameters for ezfit."""
+"""Modeling functions and parameters module for ezfit.
+
+This module provides the core Model and Parameter classes that encapsulate
+mathematical models, their parameters, and fit results. These classes form
+the foundation of ezfit's fitting interface and provide a unified API for
+working with fitted models.
+
+Features
+--------
+- Parameter management with bounds, constraints, and priors
+- Model evaluation and parameter access via dictionary-like interface
+- MCMC chain visualization methods (corner plots, trace plots)
+- Fit result storage and summary generation
+- Automatic parameter initialization from function signatures
+"""
 
 import inspect
 import warnings
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -18,20 +32,28 @@ class Parameter:
 
     Attributes
     ----------
-        value: Initial/default value of the parameter.
-        fixed: Whether the parameter is fixed (not varied during fitting).
-        min: Minimum allowed value (lower bound).
-        max: Maximum allowed value (upper bound).
-        err: Error/uncertainty on the parameter value.
-        constraint: Optional constraint function that takes a dict of all parameter
-            values and returns True if constraint is satisfied, False otherwise.
-            Example: lambda p: p["param1"] + p["param2"] < 1.0
-        distribution: Prior distribution type for MCMC sampling. Options:
-            "uniform", "normal", "loguniform". Default is None (uses bounds).
-        prior_args: Additional arguments for the prior distribution.
-            For "normal": {"loc": mean, "scale": std}
-            For "uniform": {"low": min, "high": max} (usually same as min/max)
-            For "loguniform": {"low": min, "high": max}
+    value : float
+        Initial/default value of the parameter.
+    fixed : bool
+        Whether the parameter is fixed (not varied during fitting).
+    min : float
+        Minimum allowed value (lower bound).
+    max : float
+        Maximum allowed value (upper bound).
+    err : float
+        Error/uncertainty on the parameter value.
+    constraint : Callable[[dict[str, float]], bool] | None
+        Optional constraint function that takes a dict of all parameter values
+        and returns True if constraint is satisfied, False otherwise.
+        Example: lambda p: p["param1"] + p["param2"] < 1.0
+    distribution : Literal["uniform", "normal", "loguniform"] | str | None
+        Prior distribution type for MCMC sampling. Options: "uniform", "normal",
+        "loguniform". Default is None (uses bounds).
+    prior_args : dict[str, Any] | None
+        Additional arguments for the prior distribution.
+        For "normal": {"loc": mean, "scale": std}
+        For "uniform": {"low": min, "high": max} (usually same as min/max)
+        For "loguniform": {"low": min, "high": max}
     """
 
     value: float = 1
@@ -66,8 +88,8 @@ class Parameter:
             if not callable(self.constraint):
                 msg = "constraint must be a callable function."
                 raise TypeError(msg)
-            # Test constraint with a dummy parameter dict to check it's callable correctly
-            # Use a dict with common parameter names to avoid KeyError for valid constraints
+            # Test constraint with a dummy parameter dict to check it's callable
+            # Use a dict with common parameter names to avoid KeyError
             try:
                 test_params = {
                     "test_param": 1.0,
@@ -84,16 +106,21 @@ class Parameter:
                 }
                 _ = self.constraint(test_params)
             except (KeyError, TypeError) as e:
-                # KeyError is expected if constraint references parameters not in test dict
+                # KeyError is expected if constraint references parameters not in test
+                # dict
                 # This is okay - we can't know all parameter names at validation time
                 # Only raise if it's a TypeError (wrong function signature)
                 if isinstance(e, TypeError):
-                    msg = f"constraint function must accept a dict[str, float] and return bool: {e}"
-                    raise ValueError(msg) from e
+                    msg = (
+                        f"constraint function must accept a dict[str, float] "
+                        f"and return bool: {e}"
+                    )
+                    raise TypeError(msg) from e
                 # KeyError is acceptable - constraint will be validated at fit time
             except Exception:
                 # Other exceptions might indicate a real problem
-                # But we'll be lenient and let it pass - will fail at fit time if truly broken
+                # But we'll be lenient and let it pass - will fail at fit time if truly
+                # broken
                 pass
 
         # Validate distribution if provided
@@ -116,10 +143,7 @@ class Parameter:
             return f"(value={self.value:.10f}, fixed=True)"
         v, e = rounded_values(self.value, self.err, 2)
         # Handle NaN/Inf in error display
-        if not np.isfinite(e):
-            e_str = "N/A" if np.isnan(e) else str(e)
-        else:
-            e_str = str(e)
+        e_str = ("N/A" if np.isnan(e) else str(e)) if not np.isfinite(e) else str(e)
         return f"(value = {v} ± {e_str}, bounds = ({self.min}, {self.max}))"
 
     def random(self) -> float:
@@ -156,7 +180,7 @@ class Model:
                 if isinstance(input_params[name], Parameter):
                     self.params[name] = input_params[name]
                 elif isinstance(input_params[name], dict):
-                    param_dict = input_params[name].copy()
+                    param_dict = cast("dict[str, Any]", input_params[name]).copy()
                     # Parse string constraint if provided
                     if "constraint" in param_dict and isinstance(
                         param_dict["constraint"], str
@@ -164,8 +188,8 @@ class Model:
                         # Get all parameter names for parsing
                         all_param_names = [
                             p
-                            for p in sig_params.keys()
-                            if p != list(sig_params.keys())[0]  # Skip x parameter
+                            for p in sig_params
+                            if p != next(iter(sig_params.keys()))  # Skip x parameter
                         ]
                         try:
                             constraint_func = parse_constraint_string(
@@ -173,29 +197,35 @@ class Model:
                             )
                             param_dict["constraint"] = constraint_func
                         except ValueError as e:
-                            warnings.warn(
-                                f"Could not parse constraint string for parameter '{name}': {e}",
-                                stacklevel=2,
+                            msg = (
+                                f"Could not parse constraint string for "
+                                f"parameter '{name}': {e}"
                             )
+                            warnings.warn(msg, stacklevel=2)
                             param_dict.pop("constraint", None)
 
                     try:
                         self.params[name] = Parameter(**param_dict)
                     except TypeError as e:
-                        raise ValueError(
-                            f"Invalid dictionary for parameter '{name}': {input_params[name]}. {e}"
-                        ) from e
+                        msg = (
+                            f"Invalid dictionary for parameter '{name}': "
+                            f"{input_params[name]}. {e}"
+                        )
+                        raise ValueError(msg) from e
                 else:
-                    raise TypeError(
-                        f"Parameter '{name}' must be a Parameter object or a dict, got {type(input_params[name])}"
+                    msg = (
+                        f"Parameter '{name}' must be a Parameter object or "
+                        f"a dict, got {type(input_params[name])}"
                     )
+                    raise TypeError(msg)
             else:
                 self.params[name] = Parameter()
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
         """Evaluate the model at the given x values."""
         if self.params is None:
-            raise ValueError("Model parameters have not been initialized.")
+            msg = "Model parameters have not been initialized."
+            raise ValueError(msg)
         nominal = self.func(x, **self.kwargs())
         if not isinstance(nominal, np.ndarray):
             nominal = np.asarray(nominal)
@@ -293,16 +323,20 @@ class Model:
     def plot_corner(self, **kwargs: dict[str, Any]) -> tuple[Any, Any]:
         """Create a corner plot from MCMC chain if available.
 
-        Args:
-            **kwargs: Additional keyword arguments passed to plot_corner.
+        Parameters
+        ----------
+        **kwargs : dict[str, Any]
+            Additional keyword arguments passed to plot_corner.
 
         Returns
         -------
+        tuple[Any, Any]
             Tuple of (figure, axes_array).
 
         Raises
         ------
-            ValueError: If no MCMC chain is available.
+        ValueError
+            If no MCMC chain is available.
         """
         from ezfit.visualization import plot_corner
 
@@ -311,21 +345,25 @@ class Model:
             raise ValueError(msg)
 
         param_names = list(self.params.keys()) if self.params else None
-        return plot_corner(self.sampler_chain, param_names=param_names, **kwargs)
+        return plot_corner(self.sampler_chain, param_names=param_names, **kwargs)  # type: ignore[arg-type]
 
     def plot_trace(self, **kwargs: dict[str, Any]) -> tuple[Any, Any]:
         """Create trace plots from MCMC chain if available.
 
-        Args:
-            **kwargs: Additional keyword arguments passed to plot_trace.
+        Parameters
+        ----------
+        **kwargs : dict[str, Any]
+            Additional keyword arguments passed to plot_trace.
 
         Returns
         -------
+        tuple[Any, Any]
             Tuple of (figure, axes_array).
 
         Raises
         ------
-            ValueError: If no MCMC chain is available.
+        ValueError
+            If no MCMC chain is available.
         """
         from ezfit.visualization import plot_trace
 
@@ -334,22 +372,30 @@ class Model:
             raise ValueError(msg)
 
         param_names = list(self.params.keys()) if self.params else None
-        return plot_trace(self.sampler_chain, param_names=param_names, **kwargs)
+        return plot_trace(self.sampler_chain, param_names=param_names, **kwargs)  # type: ignore[arg-type]
 
-    def get_posterior_samples(self, discard: int | None = None, thin: int | None = None) -> np.ndarray:
+    def get_posterior_samples(
+        self, discard: int | None = None, thin: int | None = None
+    ) -> np.ndarray:
         """Get posterior samples from MCMC chain.
 
-        Args:
-            discard: Number of samples to discard as burn-in. If None, uses automatic detection.
-            thin: Thinning factor. If None, uses automatic thinning.
+        Parameters
+        ----------
+        discard : int | None, optional
+            Number of samples to discard as burn-in. If None, uses automatic detection,
+            by default None.
+        thin : int | None, optional
+            Thinning factor. If None, uses automatic thinning, by default None.
 
         Returns
         -------
-            Array of posterior samples.
+        np.ndarray
+            Array of posterior samples with shape (n_samples, n_params).
 
         Raises
         ------
-            ValueError: If no MCMC chain is available.
+        ValueError
+            If no MCMC chain is available.
         """
         if self.sampler_chain is None:
             msg = "No MCMC chain available. Use method='emcee' to generate a chain."
@@ -359,16 +405,10 @@ class Model:
 
         # Apply discard and thin if provided
         if discard is not None:
-            if chain.ndim == 3:
-                chain = chain[:, discard:, :]
-            else:
-                chain = chain[discard:, :]
+            chain = chain[:, discard:, :] if chain.ndim == 3 else chain[discard:, :]
 
         if thin is not None and thin > 1:
-            if chain.ndim == 3:
-                chain = chain[:, ::thin, :]
-            else:
-                chain = chain[::thin, :]
+            chain = chain[:, ::thin, :] if chain.ndim == 3 else chain[::thin, :]
 
         # Flatten if 3D
         if chain.ndim == 3:
@@ -381,7 +421,9 @@ class Model:
 
         Returns
         -------
-            String summary of the fit.
+        str
+            String summary of the fit including model description, parameters,
+            chi-squared statistics, and MCMC diagnostics if available.
         """
         summary_lines = [self.describe()]
 
@@ -402,20 +444,30 @@ class Model:
                     summary_lines.append(f"  ESS: {ess:.2f}")
                 else:
                     summary_lines.append(f"  ESS: {ess}")
-                summary_lines.append(
-                    f"  Burn-in: {diagnostics.get('burnin', 'N/A')}"
-                )
-                summary_lines.append(
-                    f"  Effective samples: {diagnostics.get('n_effective_samples', 'N/A')}"
-                )
+                summary_lines.append(f"  Burn-in: {diagnostics.get('burnin', 'N/A')}")
+                n_eff = diagnostics.get("n_effective_samples", "N/A")
+                summary_lines.append(f"  Effective samples: {n_eff}")
                 converged = diagnostics.get("converged", False)
                 summary_lines.append(f"  Converged: {converged}")
 
         return "\n".join(summary_lines)
 
 
-def sig_fig_round(x, n):
-    """Round a number to n significant figures."""
+def sig_fig_round(x: float, n: int) -> float:
+    """Round a number to n significant figures.
+
+    Parameters
+    ----------
+    x : float
+        Number to round.
+    n : int
+        Number of significant figures.
+
+    Returns
+    -------
+    float
+        Rounded number with n significant figures.
+    """
     if x == 0:
         return 0
     if not np.isfinite(x):
@@ -424,15 +476,27 @@ def sig_fig_round(x, n):
     return round(x, -int(np.floor(np.log10(abs(x))) - (n - 1)))
 
 
-def rounded_values(x, xerr, n):
-    """Round the values and errors to n significant figures."""
+def rounded_values(x: float, xerr: float, n: int) -> tuple[float, float]:
+    """Round the values and errors to n significant figures.
+
+    Parameters
+    ----------
+    x : float
+        Value to round.
+    xerr : float
+        Error to round.
+    n : int
+        Number of significant figures for error.
+
+    Returns
+    -------
+    tuple[float, float]
+        Tuple of (rounded_value, rounded_error).
+    """
     err = sig_fig_round(xerr, n)
     if not np.isfinite(err) or err == 0:
         # Handle NaN, Inf, or zero error - just round the value normally
-        if np.isfinite(x):
-            val = round(x, n)
-        else:
-            val = x
+        val = round(x, n) if np.isfinite(x) else x
     else:
         val = round(x, -int(np.floor(np.log10(err))))
     return val, err
