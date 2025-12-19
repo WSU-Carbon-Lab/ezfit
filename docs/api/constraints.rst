@@ -4,11 +4,11 @@ Parameter Constraints
 The constraints module provides utilities for specifying relationships between parameters.
 
 .. automodule:: ezfit.constraints
-   :members:
+   :no-members:
    :undoc-members:
 
 Constraint Functions
--------------------
+--------------------
 
 .. autofunction:: ezfit.constraints.less_than
 
@@ -38,7 +38,7 @@ String Constraints
    )
 
 Function Constraints
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 

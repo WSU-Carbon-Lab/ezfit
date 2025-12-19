@@ -36,7 +36,11 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          uv sync --extra docs --extra notebook --python=3.13
+          uv sync --extra docs --extra notebook --extra mcmc --python=3.13
+
+      - name: Verify package installation
+        run: |
+          uv run python -c "import ezfit; print('ezfit package imported successfully')"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

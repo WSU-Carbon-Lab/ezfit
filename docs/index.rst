@@ -75,6 +75,7 @@ Tutorials
    :maxdepth: 1
    :caption: Tutorials
 
+   notebooks/tutorial_1_data_plotting_and_fitting
    notebooks/beginner_fitting
    notebooks/intermediate_fitting
    notebooks/advanced_fitting

@@ -4,7 +4,7 @@ Built-in Functions
 ezfit provides several commonly used model functions optimized with numba.
 
 .. automodule:: ezfit.functions
-   :members:
+   :no-members:
    :undoc-members:
 
 Available Functions

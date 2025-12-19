@@ -1393,16 +1393,12 @@ def _fit_emcee(
     try:
         chain = sampler.get_chain(discard=discard, thin=thin, flat=flat)
         # Validate chain
-        if (
-            chain is not None
-            and chain.size > 0
-            and np.all(~np.isfinite(chain))
-        ):
-                warnings.warn(
-                    "MCMC chain contains only NaN/Inf values. Sampler may have failed.",
-                    stacklevel=2,
-                )
-                chain = None
+        if chain is not None and chain.size > 0 and np.all(~np.isfinite(chain)):
+            warnings.warn(
+                "MCMC chain contains only NaN/Inf values. Sampler may have failed.",
+                stacklevel=2,
+            )
+            chain = None
     except Exception as e:
         warnings.warn(
             f"Could not retrieve processed chain from sampler: {e}", stacklevel=2

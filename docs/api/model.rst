@@ -18,6 +18,7 @@ Parameter
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Examples
 --------
@@ -46,7 +47,7 @@ Creating a Model
    y = model(x)
 
 Accessing Parameters
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
