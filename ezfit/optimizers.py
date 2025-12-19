@@ -30,9 +30,6 @@ from scipy.optimize import (
 )
 
 if TYPE_CHECKING:
-    from scipy.optimize import (
-        NonlinearConstraint,
-    )
     from sklearn.linear_model import (
         BayesianRidge,
         ElasticNet,
@@ -287,6 +284,8 @@ def _fit_minimize(
     constraints_list = fit_kwargs.get("constraints", [])
     # Ensure constraints_list is a list (not a dict or None)
     if not isinstance(constraints_list, list):
+        from scipy.optimize import NonlinearConstraint
+
         constraints_list: list[NonlinearConstraint] = (
             [constraints_list] if constraints_list is not None else []
         )
@@ -704,7 +703,10 @@ def _fit_bayesian_ridge(
         If model is not linear in parameters or has no parameters.
     """
     if BayesianRidge is None:
-        msg = "scikit-learn is required for Bayesian Ridge fitting. Install with: pip install scikit-learn"
+        msg = (
+            "scikit-learn is required for Bayesian Ridge fitting. "
+            "Install with: pip install scikit-learn"
+        )
         raise ImportError(msg)
 
     # Check if model is linear in parameters
@@ -875,7 +877,10 @@ def _fit_ridge(
         If fitting fails.
     """
     if Ridge is None:
-        msg = "scikit-learn is required for Ridge fitting. Install with: pip install scikit-learn"
+        msg = (
+            "scikit-learn is required for Ridge fitting. "
+            "Install with: pip install scikit-learn"
+        )
         raise ImportError(msg)
 
     from ezfit.sklearn_adapter import construct_design_matrix
@@ -960,7 +965,10 @@ def _fit_lasso(
         If fitting fails.
     """
     if Lasso is None:
-        msg = "scikit-learn is required for Lasso fitting. Install with: pip install scikit-learn"
+        msg = (
+            "scikit-learn is required for Lasso fitting. "
+            "Install with: pip install scikit-learn"
+        )
         raise ImportError(msg)
 
     from ezfit.sklearn_adapter import construct_design_matrix
@@ -1043,7 +1051,10 @@ def _fit_elasticnet(
         If fitting fails.
     """
     if ElasticNet is None:
-        msg = "scikit-learn is required for ElasticNet fitting. Install with: pip install scikit-learn"
+        msg = (
+            "scikit-learn is required for ElasticNet fitting. "
+            "Install with: pip install scikit-learn"
+        )
         raise ImportError(msg)
 
     from ezfit.sklearn_adapter import construct_design_matrix
@@ -1131,7 +1142,10 @@ def _fit_polynomial(
         If fitting fails.
     """
     if LinearRegression is None or PolynomialFeatures is None:
-        msg = "scikit-learn is required for polynomial fitting. Install with: pip install scikit-learn"
+        msg = (
+            "scikit-learn is required for polynomial fitting. "
+            "Install with: pip install scikit-learn"
+        )
         raise ImportError(msg)
 
     from ezfit.sklearn_adapter import convert_to_polynomial_model
@@ -1379,9 +1393,11 @@ def _fit_emcee(
     try:
         chain = sampler.get_chain(discard=discard, thin=thin, flat=flat)
         # Validate chain
-        if chain is not None and chain.size > 0:
-            # Check if chain has valid (finite) values
-            if np.all(~np.isfinite(chain)):
+        if (
+            chain is not None
+            and chain.size > 0
+            and np.all(~np.isfinite(chain))
+        ):
                 warnings.warn(
                     "MCMC chain contains only NaN/Inf values. Sampler may have failed.",
                     stacklevel=2,

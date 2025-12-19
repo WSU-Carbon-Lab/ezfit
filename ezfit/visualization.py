@@ -88,7 +88,10 @@ def plot_corner(
         param_names = [f"param{i}" for i in range(n_params)]
 
     if len(param_names) != n_params:
-        msg = f"Number of parameter names ({len(param_names)}) must match number of parameters ({n_params})"
+        msg = (
+            f"Number of parameter names ({len(param_names)}) must match "
+            f"number of parameters ({n_params})"
+        )
         raise ValueError(msg)
 
     # Default kwargs for corner plot
@@ -147,7 +150,6 @@ def plot_trace(
         plot_walkers = True
     elif chain.ndim == 2:
         n_samples, n_params = chain.shape
-        n_steps = n_samples
         plot_walkers = False
     else:
         msg = f"Chain must be 2D or 3D, got shape {chain.shape}"
@@ -157,7 +159,10 @@ def plot_trace(
         param_names = [f"param{i}" for i in range(n_params)]
 
     if len(param_names) != n_params:
-        msg = f"Number of parameter names ({len(param_names)}) must match number of parameters ({n_params})"
+        msg = (
+            f"Number of parameter names ({len(param_names)}) must match "
+            f"number of parameters ({n_params})"
+        )
         raise ValueError(msg)
 
     # Create figure and axes if not provided
@@ -241,7 +246,10 @@ def plot_posterior(
         param_names = [f"param{i}" for i in range(n_params)]
 
     if len(param_names) != n_params:
-        msg = f"Number of parameter names ({len(param_names)}) must match number of parameters ({n_params})"
+        msg = (
+            f"Number of parameter names ({len(param_names)}) must match "
+            f"number of parameters ({n_params})"
+        )
         raise ValueError(msg)
 
     # Create figure and axes if not provided

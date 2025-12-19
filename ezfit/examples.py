@@ -19,6 +19,8 @@ that are compatible with the ezfit fitting interface.
 import numpy as np
 import pandas as pd
 
+# ========= / Functional Generators / =========
+
 
 def generate_linear_data(
     n_points: int = 50,
@@ -352,7 +354,7 @@ def generate_rugged_surface_data(
     return pd.DataFrame({"x": x, "y": y, "yerr": yerr})
 
 
-def generate_exponential_decay_data(
+def generate_exponential_data(
     n_points: int = 50,
     amplitude: float = 10.0,
     decay_rate: float = 0.5,
@@ -387,7 +389,7 @@ def generate_exponential_decay_data(
     """
     if seed is not None:
         np.random.seed(seed)
-
+    # Compute as a
     x = np.linspace(x_range[0], x_range[1], n_points)
     y_true = amplitude * np.exp(-decay_rate * x) + baseline
     noise = np.random.normal(0, noise_level, n_points)
@@ -516,3 +518,68 @@ def generate_oscillatory_data(
     yerr = np.full_like(y, noise_level)
 
     return pd.DataFrame({"x": x, "y": y, "yerr": yerr})
+
+
+# ========= / Grab Data From File / =========
+
+
+def get_dataset_names() -> list[str]:
+    """Return a list of the names of the pre generated datasets.
+
+    Returns
+    -------
+    list[str]
+        List of available dataset names (without .csv extension).
+    """
+    import importlib.resources
+    from pathlib import Path
+
+    from ezfit import data as data_module
+
+    datasets: list[str] = []
+    for f in importlib.resources.files(data_module).iterdir():
+        f_path = Path(str(f))
+        if f_path.suffix == ".csv":
+            datasets.append(f_path.stem)
+    return sorted(datasets)
+
+
+def load_dataset(name: str) -> pd.DataFrame:
+    """Load a pre generated dataset from the data folder.
+
+    Parameters
+    ----------
+    name : str
+        Name of the dataset to load. Available datasets:
+        - 'current_voltage_data': Current-voltage measurement data
+        - 'powerlaw': Power law relationship data
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the dataset.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified dataset name is not found.
+    """
+    import importlib.resources
+
+    from ezfit import data as data_module
+
+    filename = f"{name}.csv" if not name.endswith(".csv") else name
+
+    try:
+        with (
+            importlib.resources.files(data_module)
+            .joinpath(filename)
+            .open(
+                encoding="utf-8",
+            ) as f
+        ):
+            return pd.read_csv(f)
+    except FileNotFoundError as e:
+        available = get_dataset_names()
+        msg = f"Dataset '{name}' not found. Available datasets: {available}"
+        raise FileNotFoundError(msg) from e

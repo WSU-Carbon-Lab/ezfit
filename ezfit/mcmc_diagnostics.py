@@ -159,10 +159,7 @@ def gelman_rubin(chain: np.ndarray) -> float:
         var_hat = ((n_steps - 1) / n_steps) * W + (1 / n_steps) * B
 
         # R-hat
-        if W > 0:
-            rhat = np.sqrt(var_hat / W)
-        else:
-            rhat = np.inf
+        rhat = np.sqrt(var_hat / W) if W > 0 else np.inf
 
         rhat_values.append(rhat)
 
@@ -258,10 +255,7 @@ def estimate_burnin(
                 # arviz.ess returns effective sample size
                 ess = az.ess(chain[:, 0])  # type: ignore[attr-defined]
                 # Convert ESS to autocorrelation time: tau = n / ESS
-                if ess > 0:
-                    tau = n_samples / ess
-                else:
-                    tau = n_samples / 4  # Fallback if ESS is invalid
+                tau = n_samples / ess if ess > 0 else n_samples / 4
                 burnin = int(5 * tau)  # Conservative: 5x autocorrelation time
                 return min(burnin, n_samples // 2)
             except Exception:
@@ -346,10 +340,9 @@ def check_convergence(
         burnin = estimate_burnin(chain)
 
     # Ensure burn-in doesn't remove all samples
-    if chain.ndim == 3:
-        max_burnin = chain.shape[1] - 10  # Keep at least 10 samples
-    else:
-        max_burnin = chain.shape[0] - 10
+    max_burnin = (
+        chain.shape[1] - 10 if chain.ndim == 3 else chain.shape[0] - 10
+    )  # Keep at least 10 samples
     burnin = min(burnin, max_burnin)
     burnin = max(0, burnin)  # Ensure non-negative
 
@@ -391,10 +384,9 @@ def check_convergence(
     diagnostics["ess"] = ess
 
     # Effective number of samples after burn-in
-    if chain.ndim == 3:
-        n_effective = int(ess * chain.shape[0])  # ESS per walker
-    else:
-        n_effective = int(ess)
+    n_effective = (
+        int(ess * chain.shape[0]) if chain.ndim == 3 else int(ess)
+    )  # ESS per walker
     diagnostics["n_effective_samples"] = n_effective
 
     # Check convergence

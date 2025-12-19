@@ -233,13 +233,14 @@ from ezfit.constraints import (
     sum_less_than,
 )
 from ezfit.examples import (
-    generate_exponential_decay_data,
     generate_gaussian_data,
     generate_linear_data,
     generate_multi_peak_data,
     generate_oscillatory_data,
     generate_polynomial_data,
     generate_rugged_surface_data,
+    get_dataset_names,
+    load_dataset,
 )
 from ezfit.fit import FitAccessor
 from ezfit.functions import (
@@ -259,16 +260,17 @@ __all__ = [
     "Parameter",
     "exponential",
     "gaussian",
-    "generate_exponential_decay_data",
     "generate_gaussian_data",
     "generate_linear_data",
     "generate_multi_peak_data",
     "generate_oscillatory_data",
     "generate_polynomial_data",
     "generate_rugged_surface_data",
+    "get_dataset_names",
     "greater_than",
     "less_than",
     "linear",
+    "load_dataset",
     "lorentzian",
     "parse_constraint_string",
     "plot_corner",

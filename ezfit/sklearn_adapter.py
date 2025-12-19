@@ -122,15 +122,16 @@ def is_linear_model(func: "Callable") -> bool:
                 node.right, ast.Constant
             ):  # Parameter raised to variable power
                 return False
-            if isinstance(node, ast.Call):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ["exp", "log", "sin", "cos", "tan", "sqrt"]
+            ):
                 # Check for nonlinear functions (exp, log, sin, etc.)
-                if isinstance(node.func, ast.Name):
-                    nonlinear_funcs = ["exp", "log", "sin", "cos", "tan", "sqrt"]
-                    if node.func.id in nonlinear_funcs:
-                        # Check if any parameters are used in these calls
-                        for arg in ast.walk(node):
-                            if isinstance(arg, ast.Name) and arg.id in param_names[1:]:
-                                return False
+                # Check if any parameters are used in these calls
+                for arg in ast.walk(node):
+                    if isinstance(arg, ast.Name) and arg.id in param_names[1:]:
+                        return False
     except Exception:
         # If we can't analyze, assume it might be linear
         pass
@@ -218,10 +219,7 @@ def convert_to_polynomial_model(
         raise ImportError(msg)
 
     # Reshape xdata to 2D if needed
-    if xdata.ndim == 1:
-        xdata_2d = xdata.reshape(-1, 1)
-    else:
-        xdata_2d = xdata
+    xdata_2d = xdata.reshape(-1, 1) if xdata.ndim == 1 else xdata
 
     poly = PolynomialFeatures(degree=degree, include_bias=True)
     feature_matrix = poly.fit_transform(xdata_2d)

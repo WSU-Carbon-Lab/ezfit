@@ -315,7 +315,8 @@ class FitAccessor:
             (e.g., `scipy.optimize.curve_fit`, `scipy.optimize.minimize`, etc.),
             by default None.
         residuals : Literal["none", "res", "percent", "rmse"], optional
-            The type of residuals to plot, by default "res".
+            The type of residuals to plot. Set to "none" to disable residuals plot,
+            by default "res".
         color_error : str, optional
             Color for data points/error bars, by default "C0".
         color_model : str, optional
@@ -538,7 +539,7 @@ class FitAccessor:
         try:
             if method in self._KWARGS_TYPE_MAP:
                 # Type casting for methods with specific kwargs types
-                fit_kwargs = cast(Any, fit_kwargs)
+                fit_kwargs = cast("Any", fit_kwargs)
             else:
                 fit_kwargs = fit_kwargs or {}
 
@@ -573,7 +574,7 @@ class FitAccessor:
         model_obj.cov = fit_result["pcov"]
         model_obj.cor = fit_result["cor"]
         # fit_result_details accepts the details field which can be various types
-        model_obj.fit_result_details = cast(Any, fit_result.get("details"))
+        model_obj.fit_result_details = cast("Any", fit_result.get("details"))
         model_obj.sampler_chain = fit_result.get("sampler_chain")
 
         popt = fit_result["popt"]
@@ -623,8 +624,8 @@ class FitAccessor:
             PlotOptions object containing all plotting parameters. If provided,
             overrides individual plotting parameters, by default None.
         residuals : Literal["none", "res", "percent", "rmse"] | None, optional
-            The type of residuals to plot. Overrides plot_options if provided,
-            by default None.
+            The type of residuals to plot. Set to "none" to disable residuals plot.
+            Overrides plot_options if provided, by default None (defaults to "res").
         color_error : str | None, optional
             Color for data points/error bars. Overrides plot_options if provided,
             by default None.
@@ -672,7 +673,7 @@ class FitAccessor:
         """
         if plot_options is None:
             plot_options = PlotOptions(
-                residuals=residuals or "res",
+                residuals=residuals if residuals is not None else "res",
                 color_error=color_error or "C0",
                 color_model=color_model or "C3",
                 color_residuals=color_residuals or "C0",

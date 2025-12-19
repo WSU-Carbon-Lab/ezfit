@@ -17,13 +17,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
-import emcee  # Add import for Sampler type hint
-from scipy.optimize import OptimizeResult
-
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import emcee  # Add import for Sampler type hint
     import numpy as np
+    from scipy.optimize import OptimizeResult
 
 FitMethod = Literal[
     "curve_fit",

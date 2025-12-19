@@ -274,7 +274,7 @@ class Model:
         if self.params is None:
             msg = "No parameters found in model."
             raise KeyError(msg)
-        yield from [(n, val) for n, val in self.params.items()]
+        yield from list(self.params.items())
 
     def values(self) -> list[float]:
         """Yield the model parameters as a list."""
@@ -435,12 +435,12 @@ class Model:
             if diagnostics is not None:
                 summary_lines.append("\nMCMC Diagnostics:")
                 rhat = diagnostics.get("rhat", "N/A")
-                if isinstance(rhat, (int, float)):
+                if isinstance(rhat, int | float):
                     summary_lines.append(f"  R-hat: {rhat:.4f}")
                 else:
                     summary_lines.append(f"  R-hat: {rhat}")
                 ess = diagnostics.get("ess", "N/A")
-                if isinstance(ess, (int, float)):
+                if isinstance(ess, int | float):
                     summary_lines.append(f"  ESS: {ess:.2f}")
                 else:
                     summary_lines.append(f"  ESS: {ess}")
