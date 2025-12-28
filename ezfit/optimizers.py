@@ -63,6 +63,7 @@ else:
 from ezfit.constraints import extract_constraints_from_model
 from ezfit.mcmc_diagnostics import check_convergence, estimate_burnin
 from ezfit.model import Model
+from ezfit.statistics import calculate_fit_statistics
 from ezfit.types import (
     CurveFitKwargs,
     DifferentialEvolutionKwargs,
@@ -84,6 +85,9 @@ def _calculate_fit_stats(
     pcov: np.ndarray | None,
 ) -> tuple[np.ndarray, float | None, float | None, np.ndarray | None]:
     """Calculate residuals, chi-squared, reduced chi-squared, and correlation matrix.
+
+    This is a backward-compatibility wrapper around the comprehensive statistics
+    calculation in ezfit.statistics.
 
     Parameters
     ----------
@@ -109,43 +113,8 @@ def _calculate_fit_stats(
         rchi2: Reduced chi-squared, or None if cannot compute.
         cor: Correlation matrix, or None if cannot compute.
     """
-    residuals = ydata - model.func(xdata, *popt)
-    chi2: float = np.inf
-    rchi2: float = np.inf
-    cor: np.ndarray | None = None
-    n_params_fit = len(popt) - sum(p.fixed for p in model.params.values())  # type: ignore
-
-    if sigma is not None and np.all(sigma > 0):
-        safe_sigma = np.where(sigma == 0, 1e-10, sigma)
-        chi2 = np.sum((residuals / safe_sigma) ** 2)
-        dof = len(xdata) - n_params_fit
-        if dof > 0:
-            rchi2 = chi2 / dof
-        else:
-            warnings.warn(
-                "Degrees of freedom <= 0, cannot calculate reduced chi-squared.",
-                stacklevel=3,
-            )
-
-    if pcov is not None and not np.all(np.isnan(pcov)):
-        diag_sqrt = np.sqrt(np.diag(pcov))
-        if np.any(diag_sqrt == 0):
-            warnings.warn(
-                (
-                    "Zero standard deviation found in covariance matrix diagonal,"
-                    "cannot compute correlation matrix."
-                ),
-                stacklevel=3,
-            )
-            cor = np.full_like(pcov, np.nan)
-        else:
-            outer_prod = np.outer(diag_sqrt, diag_sqrt)
-            cor = np.divide(
-                pcov, outer_prod, out=np.full_like(pcov, np.nan), where=outer_prod != 0
-            )
-            np.fill_diagonal(cor, 1.0)
-
-    return residuals, chi2, rchi2, cor
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
+    return stats["residuals"], stats["chi2"], stats["rchi2"], stats["cor"]
 
 
 # --- Optimizer Functions ---
@@ -215,9 +184,7 @@ def _fit_curve_fit(
         if pcov is not None and not np.all(np.isnan(pcov))
         else np.full_like(popt, np.nan)
     )
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {
         "infodict": infodict,
@@ -232,10 +199,16 @@ def _fit_curve_fit(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -358,18 +331,22 @@ def _fit_minimize(
         if pcov is not None and not np.all(np.isnan(pcov))
         else np.full_like(popt, np.nan)
     )
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     return FitResult(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=result,
         sampler_chain=None,
     )
@@ -505,18 +482,22 @@ def _fit_differential_evolution(
             )
             pcov = np.full((len(popt), len(popt)), np.nan)
             perr = np.full_like(popt, np.nan)
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     return FitResult(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=result,
         sampler_chain=None,
     )
@@ -576,18 +557,22 @@ def _fit_shgo(
     warnings.warn("Covariance matrix not available from shgo.", stacklevel=2)
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     return FitResult(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=result,
         sampler_chain=None,
     )
@@ -647,18 +632,22 @@ def _fit_dual_annealing(
     warnings.warn("Covariance matrix not available from dual_annealing.", stacklevel=2)
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     return FitResult(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=result,
         sampler_chain=None,
     )
@@ -814,11 +803,7 @@ def _fit_bayesian_ridge(
         perr = np.full_like(popt, np.nan)
 
     # Calculate residuals and statistics
-    y_pred = br_model.predict(design_matrix)  # type: ignore
-    residuals = ydata - y_pred
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {
         "model": br_model,
@@ -833,10 +818,16 @@ def _fit_bayesian_ridge(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -911,9 +902,7 @@ def _fit_ridge(
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
 
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {"model": ridge_model, "alpha": ridge_model.alpha}  # type: ignore
 
@@ -921,10 +910,16 @@ def _fit_ridge(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -997,9 +992,7 @@ def _fit_lasso(
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
 
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {"model": lasso_model, "alpha": lasso_model.alpha}  # type: ignore
 
@@ -1007,10 +1000,16 @@ def _fit_lasso(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -1083,9 +1082,7 @@ def _fit_elasticnet(
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
 
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {
         "model": elastic_model,
@@ -1097,10 +1094,16 @@ def _fit_elasticnet(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -1177,9 +1180,7 @@ def _fit_polynomial(
     pcov = np.full((len(popt), len(popt)), np.nan)
     perr = np.full_like(popt, np.nan)
 
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     details = {
         "model": lin_model,
@@ -1191,10 +1192,16 @@ def _fit_polynomial(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details,
         sampler_chain=None,
     )
@@ -1326,17 +1333,21 @@ def _fit_emcee(
         perr = np.full(ndim, np.nan)
         pcov = np.full((ndim, ndim), np.nan)
         chain = None
-        residuals, chi2, rchi2, cor = _calculate_fit_stats(
-            model, xdata, ydata, sigma, popt, pcov
-        )
+        stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
         return FitResult(
             popt=popt,
             perr=perr,
             pcov=pcov,
-            residuals=residuals,
-            chi2=chi2,
-            rchi2=rchi2,
-            cor=cor,
+            residuals=stats["residuals"],
+            chi2=stats["chi2"],
+            rchi2=stats["rchi2"],
+            cor=stats["cor"],
+            r_squared=stats["r_squared"],
+            pearson_r=stats["pearson_r"],
+            rmse=stats["rmse"],
+            rmsd=stats["rmsd"],
+            bic=stats["bic"],
+            aic=stats["aic"],
             details=sampler,
             sampler_chain=chain,
         )
@@ -1478,9 +1489,7 @@ def _fit_emcee(
         except Exception as e:
             warnings.warn(f"Error processing MCMC chain results: {e}", stacklevel=2)
 
-    residuals, chi2, rchi2, cor = _calculate_fit_stats(
-        model, xdata, ydata, sigma, popt, pcov
-    )
+    stats = calculate_fit_statistics(model, xdata, ydata, sigma, popt, pcov)
 
     # Store diagnostics in details
     details_dict: dict[str, Any] = {"sampler": sampler}
@@ -1493,10 +1502,16 @@ def _fit_emcee(
         popt=popt,
         perr=perr,
         pcov=pcov,
-        residuals=residuals,
-        chi2=chi2,
-        rchi2=rchi2,
-        cor=cor,
+        residuals=stats["residuals"],
+        chi2=stats["chi2"],
+        rchi2=stats["rchi2"],
+        cor=stats["cor"],
+        r_squared=stats["r_squared"],
+        pearson_r=stats["pearson_r"],
+        rmse=stats["rmse"],
+        rmsd=stats["rmsd"],
+        bic=stats["bic"],
+        aic=stats["aic"],
         details=details_dict,
         sampler_chain=chain,
     )

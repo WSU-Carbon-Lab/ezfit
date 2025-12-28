@@ -7,6 +7,10 @@ dependencies = [
     "pandas>=2.2.2",
     "scikit-learn>=1.8.0",
     "scipy>=1.16.3",
+    "emcee>=3.1.0",
+    "corner",
+    "arviz>=0.18.0",
+    "tqdm>=4.67.1"
 ]
 description = "Fitting in python made easy"
 license = "GPL-2.0"
@@ -17,7 +21,6 @@ requires-python = ">=3.13"
 version = "0.5.5"
 
 [project.optional-dependencies]
-mcmc = ["emcee>=3.1.0", "corner", "arviz>=0.18.0", "tqdm>=4.67.1"]
 docs = [
   "sphinx>=7.0.0",
   "sphinx-autodoc-typehints>=1.24.0",
@@ -34,6 +37,10 @@ dev = [
   "scipy-stubs",
 ]
 notebook = [
+  "jupyter>=1.0.0",
+  "ipykernel>=6.25.0",
+]
+all = [
   "jupyter>=1.0.0",
   "ipykernel>=6.25.0",
 ]
@@ -118,11 +125,3 @@ module = [
     "numpy.*"
 ]
 ignore_missing_imports = true
-
-[dependency-groups]
-dev = [
-    "ruff>=0.14.8",
-]
-mcmc = [
-    "tqdm>=4.67.1",
-]

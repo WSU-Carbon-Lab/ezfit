@@ -1,5 +1,4 @@
-"""
-Fit module for ezfit.
+"""Fit module for ezfit.
 
 This module provides the primary interface for fitting mathematical models to data
 stored in a pandas DataFrame. It offers highly flexible fitting routines, comprehensive
@@ -56,15 +55,15 @@ ezfit.types
     Type hints for fit methods and fit keyword options.
 """
 
+from __future__ import annotations
+
 import warnings
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.axes import Axes
 
 from ezfit.exceptions import ColumnNotFoundError
 from ezfit.model import Model
@@ -83,11 +82,15 @@ from ezfit.optimizers import (  # Import optimizer functions
 )
 
 if TYPE_CHECKING:
-    from ezfit.optimizers import FitResult
-from ezfit.types import (  # Import specific Kwargs types
-    FitKwargs,
-    FitMethod,
-)
+    from collections.abc import Callable
+
+    from matplotlib.axes import Axes
+
+    from ezfit.types import (  # Import specific Kwargs types
+        FitKwargs,
+        FitMethod,
+        FitResult,
+    )
 
 
 @dataclass
@@ -118,7 +121,7 @@ class FitData:
         x: str,
         y: str,
         yerr: str | None = None,
-    ) -> "FitData":
+    ) -> FitData:
         """Create FitData from DataFrame with validation.
 
         Parameters
@@ -475,7 +478,7 @@ class FitAccessor:
             fit_kwargs=fit_kwargs,
         )
 
-        self._update_model_from_fit_result(model_obj, fit_result)
+        self._update_model_from_fit_result(model_obj, fit_result, fit_data)
 
         return model_obj
 
@@ -506,7 +509,7 @@ class FitAccessor:
         model: Model,
         fit_data: FitData,
         fit_kwargs: FitKwargs,
-    ) -> "FitResult":
+    ) -> FitResult:
         """Execute the appropriate fit method.
 
         Parameters
@@ -557,7 +560,7 @@ class FitAccessor:
             return fit_result
 
     def _update_model_from_fit_result(
-        self, model_obj: Model, fit_result: "FitResult"
+        self, model_obj: Model, fit_result: FitResult, fit_data: FitData | None = None
     ) -> None:
         """Update model object with fit results.
 
@@ -567,15 +570,29 @@ class FitAccessor:
             The Model object to update.
         fit_result : FitResult
             The FitResult from the optimizer.
+        fit_data : FitData | None, optional
+            The fit data used for fitting. If provided, x_bounds are stored.
+            By default None.
         """
         model_obj.residuals = fit_result["residuals"]
         model_obj.𝜒2 = fit_result["chi2"]
         model_obj.r𝜒2 = fit_result["rchi2"]
         model_obj.cov = fit_result["pcov"]
         model_obj.cor = fit_result["cor"]
+        model_obj.r_squared = fit_result.get("r_squared")
+        model_obj.pearson_r = fit_result.get("pearson_r")
+        model_obj.rmse = fit_result.get("rmse")
+        model_obj.rmsd = fit_result.get("rmsd")
+        model_obj.bic = fit_result.get("bic")
+        model_obj.aic = fit_result.get("aic")
         # fit_result_details accepts the details field which can be various types
         model_obj.fit_result_details = cast("Any", fit_result.get("details"))
         model_obj.sampler_chain = fit_result.get("sampler_chain")
+
+        # Store x_bounds if fit_data is provided
+        if fit_data is not None:
+            model_obj.x_min = float(np.min(fit_data.xdata))
+            model_obj.x_max = float(np.max(fit_data.xdata))
 
         popt = fit_result["popt"]
         perr = fit_result["perr"]
@@ -808,8 +825,22 @@ class FitAccessor:
         plot_options : PlotOptions
             Plotting options.
         """
-        x_smooth = np.linspace(xdata.min(), xdata.max(), 500)
-        y_model = model(x_smooth)
+        # Use new Model.__call__() API with automatic bounds
+        try:
+            if model.x_min is not None and model.x_max is not None:
+                x_smooth = np.linspace(model.x_min, model.x_max, 500)
+                y_model = model(x_smooth)
+            else:
+
+                def _raise(exc):
+                    raise exc
+
+                msg = "x_bounds not available"
+                _raise(ValueError(msg))
+        except (ValueError, AttributeError):
+            # Fallback to old method if bounds are not available
+            x_smooth = np.linspace(xdata.min(), xdata.max(), 500)
+            y_model = model(x_smooth)
 
         ax.plot(
             x_smooth,

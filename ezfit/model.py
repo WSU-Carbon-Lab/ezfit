@@ -18,12 +18,15 @@ import inspect
 import warnings
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
 from ezfit.constraints import parse_constraint_string
 from ezfit.types import FitResult
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 
 @dataclass
@@ -163,6 +166,14 @@ class Model:
     cor: np.ndarray | None = None
     𝜒2: float | None = None
     r𝜒2: float | None = None
+    x_min: float | None = None
+    x_max: float | None = None
+    r_squared: float | None = None
+    pearson_r: float | None = None
+    rmse: float | None = None
+    rmsd: float | None = None
+    bic: float | None = None
+    aic: float | None = None
     sampler_chain: np.ndarray | None = None
     fit_result_details: FitResult | None = field(default=None, repr=False, init=False)
 
@@ -177,10 +188,25 @@ class Model:
             if i == 0:
                 continue
             if name in input_params:
-                if isinstance(input_params[name], Parameter):
-                    self.params[name] = input_params[name]
-                elif isinstance(input_params[name], dict):
-                    param_dict = cast("dict[str, Any]", input_params[name]).copy()
+                param_value = input_params[name]
+
+                if isinstance(param_value, Parameter):
+                    self.params[name] = param_value
+                elif isinstance(param_value, (int, float, np.number)) or (
+                    isinstance(param_value, np.ndarray) and param_value.ndim == 0
+                ):
+                    # Convert numeric value to dict with "value" key
+                    param_dict = {"value": float(param_value)}
+                    try:
+                        self.params[name] = Parameter(**param_dict)
+                    except TypeError as e:
+                        msg = (
+                            f"Invalid numeric value for parameter '{name}': "
+                            f"{param_value}. {e}"
+                        )
+                        raise ValueError(msg) from e
+                elif isinstance(param_value, dict):
+                    param_dict = cast("dict[str, Any]", param_value).copy()
                     # Parse string constraint if provided
                     if "constraint" in param_dict and isinstance(
                         param_dict["constraint"], str
@@ -214,45 +240,260 @@ class Model:
                         raise ValueError(msg) from e
                 else:
                     msg = (
-                        f"Parameter '{name}' must be a Parameter object or "
-                        f"a dict, got {type(input_params[name])}"
+                        f"Parameter '{name}' must be a Parameter object, "
+                        f"a numeric value (int, float), or a dict, "
+                        f"got {type(input_params[name])}"
                     )
                     raise TypeError(msg)
             else:
                 self.params[name] = Parameter()
 
-    def __call__(self, x: np.ndarray) -> np.ndarray:
-        """Evaluate the model at the given x values."""
+    def __call__(
+        self,
+        x: np.ndarray | None = None,
+        *,
+        start: float | None = None,
+        stop: float | None = None,
+        num: int = 500,
+        endpoint: bool = True,
+        spacing: Literal["lin", "log"] = "lin",
+    ) -> np.ndarray:
+        """Evaluate the model at the given x values or generate a smooth array.
+
+        If x is provided (positional argument), it is used directly for backward
+        compatibility. Otherwise, generates a smooth array using start/stop or
+        stored x_bounds from fitting.
+
+        Parameters
+        ----------
+        x : np.ndarray | None, optional
+            Direct x values to evaluate. If provided, other parameters are ignored.
+            For backward compatibility, by default None.
+        start : float | None, optional
+            Start value for generating x array. If None, uses stored x_min from fitting.
+            By default None.
+        stop : float | None, optional
+            Stop value for generating x array. If None, uses stored x_max from fitting.
+            By default None.
+        num : int, optional
+            Number of points to generate, by default 500.
+        endpoint : bool, optional
+            Whether to include the stop value, by default True.
+        spacing : Literal["lin", "log"], optional
+            Spacing type: "lin" for linear (np.linspace) or "log" for logarithmic
+            (np.logspace), by default "lin".
+
+        Returns
+        -------
+        np.ndarray
+            Model evaluation at the specified x values.
+
+        Raises
+        ------
+        ValueError
+            If parameters have not been initialized, or if bounds are not available
+            and not provided.
+        """
         if self.params is None:
             msg = "Model parameters have not been initialized."
             raise ValueError(msg)
-        nominal = self.func(x, **self.kwargs())
+
+        # Backward compatibility: if x is provided as positional argument,
+        # use it directly
+        if x is not None:
+            nominal = self.func(x, **self.kwargs())
+            if not isinstance(nominal, np.ndarray):
+                nominal = np.asarray(nominal)
+            return nominal
+
+        # Generate x array using bounds
+        if start is None:
+            if self.x_min is None:
+                msg = (
+                    "x_min is not available. Either provide 'start' parameter or "
+                    "fit the model first to store x bounds."
+                )
+                raise ValueError(msg)
+            start = self.x_min
+
+        if stop is None:
+            if self.x_max is None:
+                msg = (
+                    "x_max is not available. Either provide 'stop' parameter or "
+                    "fit the model first to store x bounds."
+                )
+                raise ValueError(msg)
+            stop = self.x_max
+
+        # Generate x array based on spacing type
+        if spacing == "log":
+            if start <= 0 or stop <= 0:
+                msg = "For log spacing, start and stop must be positive."
+                raise ValueError(msg)
+            x_array = np.logspace(
+                np.log10(start), np.log10(stop), num=num, endpoint=endpoint
+            )
+        else:  # spacing == "lin"
+            x_array = np.linspace(start, stop, num=num, endpoint=endpoint)
+
+        nominal = self.func(x_array, **self.kwargs())
         if not isinstance(nominal, np.ndarray):
             nominal = np.asarray(nominal)
         return nominal
 
     def __repr__(self) -> str:
-        """Return a string representation of the model."""
+        """Return a compact string representation of the model."""
         name = self.func.__name__
-        chi = f"𝜒2: {self.𝜒2}" if self.𝜒2 is not None else "𝜒2: None"
-        rchi = f"reduced 𝜒2: {self.r𝜒2}" if self.r𝜒2 is not None else "reduced 𝜒2: None"
-        if self.params is None:
-            return f"{name}\n{chi}\n{rchi}\n"
-        params = "\n".join([f"{v} : {param}" for v, param in self.params.items()])
-        with np.printoptions(suppress=True, precision=4):
-            _cov = (
-                self.cov
-                if self.cov is not None
-                else np.zeros((len(self.params), len(self.params)))
+        lines = [f"{name}()"]
+
+        if self.params is not None:
+            param_strs = []
+            for v, param in self.params.items():
+                if param.fixed:
+                    param_strs.append(f"{v}={param.value:.4g}(fixed)")
+                else:
+                    v, e = rounded_values(param.value, param.err, 2)
+                    e_str = "N/A" if not np.isfinite(e) or np.isnan(e) else f"±{e}"
+                    param_strs.append(f"{v}={v}{e_str}")
+            lines.append("  " + ", ".join(param_strs))
+
+        # Statistics on one line
+        stats = []
+        if self.𝜒2 is not None:
+            stats.append(f"𝜒²={self.𝜒2:.4g}")
+        if self.r𝜒2 is not None:
+            stats.append(f"r𝜒²={self.r𝜒2:.4g}")
+        if self.𝜒2 is None:
+            if self.r_squared is not None:
+                stats.append(f"R²={self.r_squared:.4f}")
+            if self.rmse is not None:
+                stats.append(f"RMSE={self.rmse:.4g}")
+            if self.bic is not None and np.isfinite(self.bic):
+                stats.append(f"BIC={self.bic:.4g}")
+            if self.aic is not None and np.isfinite(self.aic):
+                stats.append(f"AIC={self.aic:.4g}")
+
+        if stats:
+            lines.append("  " + ", ".join(stats))
+
+        return "\n".join(lines)
+
+    def _repr_html_(self) -> str:
+        """Return compact HTML representation for Jupyter notebooks."""
+        name = self.func.__name__
+        div_style = "font-family: monospace; line-height: 1.4;"
+        html_parts = [f'<div style="{div_style}">']
+
+        # Header
+        h3_style = "margin: 0 0 8px 0; color: #0066cc; font-size: 1.1em;"
+        html_parts.append(f'<h3 style="{h3_style}"><strong>{name}()</strong></h3>')
+
+        # Combined parameters and statistics table
+        table_style = (
+            "border-collapse: collapse; margin-bottom: 8px; font-size: 0.95em;"
+        )
+        html_parts.append(f'<table style="{table_style}">')
+
+        # Parameters row
+        if self.params is not None:
+            param_cells = []
+            for param_name, param in self.params.items():
+                if param.fixed:
+                    fixed_span = "<span style='color:#888;'>(fixed)</span>"
+                    param_str = f"{param_name}={param.value:.4g}{fixed_span}"
+                else:
+                    v, e = rounded_values(param.value, param.err, 2)
+                    e_str = (
+                        "" if not np.isfinite(e) or np.isnan(e) or e == 0 else f"±{e}"
+                    )
+                    param_str = f"{param_name}={v}{e_str}"
+                param_cells.append(param_str)
+
+            td_style = "padding: 4px 8px; border: 1px solid #ddd;"
+            td_bold = f"{td_style} font-weight: bold; background-color: #f5f5f5;"
+            html_parts.append(
+                f"<tr>"
+                f'<td style="{td_bold}">Parameters:</td>'
+                f'<td style="{td_style}">{" ".join(param_cells)}</td>'
+                f"</tr>"
             )
-            _cor = (
-                self.cor
-                if self.cor is not None
-                else np.zeros((len(self.params), len(self.params)))
+
+        # Statistics row
+        stats = []
+        if self.𝜒2 is not None:
+            stats.append(f"𝜒²={self.𝜒2:.4g}")
+        if self.r𝜒2 is not None:
+            stats.append(f"r𝜒²={self.r𝜒2:.4g}")
+        if self.𝜒2 is None:
+            if self.r_squared is not None:
+                stats.append(f"R²={self.r_squared:.4f}")
+            if self.rmse is not None:
+                stats.append(f"RMSE={self.rmse:.4g}")
+            if self.bic is not None and np.isfinite(self.bic):
+                stats.append(f"BIC={self.bic:.4g}")
+            if self.aic is not None and np.isfinite(self.aic):
+                stats.append(f"AIC={self.aic:.4g}")
+
+        if stats:
+            td_style = "padding: 4px 8px; border: 1px solid #ddd;"
+            td_bold = f"{td_style} font-weight: bold; background-color: #f5f5f5;"
+            html_parts.append(
+                f"<tr>"
+                f'<td style="{td_bold}">Statistics:</td>'
+                f'<td style="{td_style}">{", ".join(stats)}</td>'
+                f"</tr>"
             )
-            cov = f"covariance:\n{_cov.__str__()}"
-            cor = f"correlation:\n{_cor.__str__()}"
-        return f"{name}\n{params}\n{chi}\n{rchi}\n{cov}\n{cor}"
+
+        html_parts.append("</table>")
+
+        # Compact matrices side by side if both exist
+        if self.params is not None and len(self.params) > 0:
+            param_names = list(self.params.keys())
+            matrices = []
+            if self.cov is not None:
+                matrices.append(("Cov", self.cov))
+            if self.cor is not None:
+                matrices.append(("Corr", self.cor))
+
+            if matrices:
+                matrix_container_style = "display: flex; gap: 15px; margin-top: 8px;"
+                html_parts.append(f'<div style="{matrix_container_style}">')
+                for label, matrix in matrices:
+                    html_parts.append(
+                        f'<div><strong style="font-size: 0.9em;">{label}:</strong>'
+                    )
+                    html_parts.append(self._matrix_to_html(matrix, param_names))
+                    html_parts.append("</div>")
+                html_parts.append("</div>")
+
+        html_parts.append("</div>")
+        return "".join(html_parts)
+
+    def _matrix_to_html(self, matrix: np.ndarray, param_names: list[str]) -> str:
+        """Convert a numpy matrix to compact HTML table."""
+        table_style = "border-collapse: collapse; font-size: 0.85em;"
+        html_parts = [f'<table style="{table_style}">']
+        th_style = (
+            "padding: 3px 6px; text-align: center; border: 1px solid #ddd; "
+            "background-color: #f0f0f0; font-weight: bold;"
+        )
+        html_parts.append(f'<tr><th style="{th_style}"></th>')
+        for name in param_names:
+            html_parts.append(f'<th style="{th_style}">{name}</th>')
+        html_parts.append("</tr>")
+
+        td_style = "padding: 3px 6px; border: 1px solid #ddd; text-align: right;"
+        td_bold = f"{td_style} background-color: #f0f0f0; font-weight: bold;"
+
+        with np.printoptions(suppress=True, precision=3):
+            for i, name in enumerate(param_names):
+                html_parts.append(f"<tr><td style='{td_bold}'>{name}</td>")
+                for j in range(len(param_names)):
+                    val = matrix[i, j]
+                    html_parts.append(f'<td style="{td_style}">{val:.3f}</td>')
+                html_parts.append("</tr>")
+        html_parts.append("</table>")
+        return "".join(html_parts)
 
     def __getitem__(self, key) -> Parameter:
         """Return the parameter with the given key."""
@@ -313,10 +554,29 @@ class Model:
             for i, (name, p) in enumerate(self.params.items()):
                 description += f"  [{i}] {name}: {p}\n"
 
+        description += "\nGoodness-of-fit Statistics:\n"
+
+        # Show chi-squared statistics if available
         if self.𝜒2 is not None:
-            description += f"\nChi-squared (𝜒2): {self.𝜒2:.4g}\n"
+            description += f"  Chi-squared (𝜒2): {self.𝜒2:.4g}\n"
         if self.r𝜒2 is not None:
-            description += f"Reduced Chi-squared (r𝜒2): {self.r𝜒2:.4g}\n"
+            description += f"  Reduced Chi-squared (r𝜒2): {self.r𝜒2:.4g}\n"
+
+        # Show alternative statistics
+        if self.r_squared is not None:
+            description += (
+                f"  R² (coefficient of determination): {self.r_squared:.4g}\n"
+            )
+        if self.pearson_r is not None and not np.isnan(self.pearson_r):
+            description += (
+                f"  Pearson correlation coefficient (r): {self.pearson_r:.4g}\n"
+            )
+        if self.rmse is not None:
+            description += f"  RMSE (Root Mean Square Error): {self.rmse:.4g}\n"
+        if self.bic is not None and np.isfinite(self.bic):
+            description += f"  BIC (Bayesian Information Criterion): {self.bic:.4g}\n"
+        if self.aic is not None and np.isfinite(self.aic):
+            description += f"  AIC (Akaike Information Criterion): {self.aic:.4g}\n"
 
         return description
 
@@ -451,6 +711,119 @@ class Model:
                 summary_lines.append(f"  Converged: {converged}")
 
         return "\n".join(summary_lines)
+
+    def plot(
+        self,
+        x: np.ndarray | None = None,
+        *,
+        start: float | None = None,
+        stop: float | None = None,
+        num: int = 500,
+        endpoint: bool = True,
+        spacing: Literal["lin", "log"] = "lin",
+        ax: "Axes | None" = None,
+        **kwargs: Any,
+    ) -> "Axes":
+        """Plot the model curve.
+
+        Parameters
+        ----------
+        x : np.ndarray | None, optional
+            X values to evaluate and plot the model at. If provided, `start`, `stop`,
+            `num`, `endpoint`, and `spacing` are ignored. By default None.
+        start : float | None, optional
+            Start value for generating x array. If None, uses stored x_min from fitting.
+            By default None.
+        stop : float | None, optional
+            Stop value for generating x array. If None, uses stored x_max from fitting.
+            By default None.
+        num : int, optional
+            Number of points to generate, by default 500.
+        endpoint : bool, optional
+            Whether to include the stop value, by default True.
+        spacing : Literal["lin", "log"], optional
+            Spacing type: "lin" for linear (np.linspace) or "log" for logarithmic
+            (np.logspace), by default "lin".
+        ax : Axes | None, optional
+            Matplotlib axes to plot on. If None, creates a new figure and axes.
+            By default None.
+        **kwargs : Any
+            All additional keyword arguments are passed directly to matplotlib's
+            `plot()` function for styling (e.g., `color`, `linestyle`, `label`,
+            `marker`).
+
+        Returns
+        -------
+        Axes
+            The matplotlib axes object.
+
+        Raises
+        ------
+        ValueError
+            If parameters have not been initialized, or if bounds are not available
+            and not provided.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ezfit.functions import linear
+        >>> model = Model(
+        ...     linear, {"m": Parameter(value=2.0), "b": Parameter(value=1.0)}
+        ... )
+        >>> ax = model.plot(start=0, stop=10)
+        >>> # Custom styling
+        >>> ax = model.plot(
+        ...     start=0, stop=10, color="blue", linestyle="--", label="My Model"
+        ... )
+        >>> # Use specific x values
+        >>> x_vals = np.linspace(0, 10, 100)
+        >>> ax = model.plot(x=x_vals, color="red")
+        """
+        import matplotlib.pyplot as plt
+
+        if self.params is None:
+            msg = "Model parameters have not been initialized."
+            raise ValueError(msg)
+
+        # Create axes if not provided
+        if ax is None:
+            fig, ax = plt.subplots()  # noqa: RUF059
+
+        # Generate x values for model curve
+        if x is not None:
+            x_model = x
+        else:
+            # Determine x bounds
+            if start is None:
+                start = self.x_min
+            if stop is None:
+                stop = self.x_max
+            if start is None or stop is None:
+                msg = (
+                    "Cannot determine x bounds for plotting. Either provide 'x' array, "
+                    "or 'start' and 'stop' parameters, or fit the model first to store "
+                    "x bounds."
+                )
+                raise ValueError(msg)
+
+            # Generate x values for model curve
+            if spacing == "log":
+                if start <= 0 or stop <= 0:
+                    msg = "For log spacing, start and stop must be positive."
+                    raise ValueError(msg)
+                x_model = np.logspace(
+                    np.log10(start), np.log10(stop), num=num, endpoint=endpoint
+                )
+            else:
+                x_model = np.linspace(start, stop, num=num, endpoint=endpoint)
+
+        # Generate model curve
+        y_model = self(x_model)
+
+        # Plot model curve with all kwargs passed to matplotlib
+        ax.plot(x_model, y_model, **kwargs)
+
+        return ax
 
 
 def sig_fig_round(x: float, n: int) -> float:

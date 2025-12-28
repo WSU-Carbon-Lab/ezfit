@@ -407,11 +407,23 @@ class FitResult(TypedDict):
     residuals : np.ndarray | None
         Residuals (ydata - model(xdata, *popt)). None if not computed.
     chi2 : float | None
-        Chi-squared statistic. None if cannot be computed.
+        Chi-squared statistic. None if cannot be computed (when sigma is not available).
     rchi2 : float | None
-        Reduced chi-squared (chi2 / degrees_of_freedom). None if cannot be computed.
+        Reduced chi-squared (chi2 / degrees_of_freedom). None if cannot be computed (when sigma is not available).
     cor : np.ndarray | None
         Correlation matrix of parameters. None if cannot be computed.
+    r_squared : float | None
+        R² (coefficient of determination). Always calculable when residuals are available.
+    pearson_r : float | None
+        Pearson correlation coefficient between observed and predicted values. Always calculable.
+    rmse : float | None
+        Root Mean Square Error. Always calculable.
+    rmsd : float | None
+        Root Mean Square Deviation (same as RMSE). Always calculable.
+    bic : float | None
+        Bayesian Information Criterion. Always calculable.
+    aic : float | None
+        Akaike Information Criterion. Always calculable.
     details : OptimizeResult | emcee.EnsembleSampler | dict[str, Any] | None
         Additional details specific to the fitting method. For MCMC methods,
         this may contain the sampler object or diagnostics dictionary.
@@ -427,6 +439,12 @@ class FitResult(TypedDict):
     chi2: float | None
     rchi2: float | None
     cor: np.ndarray | None
+    r_squared: float | None
+    pearson_r: float | None
+    rmse: float | None
+    rmsd: float | None
+    bic: float | None
+    aic: float | None
     details: (
         OptimizeResult | emcee.EnsembleSampler | dict[str, Any] | None
     )  # More specific type for details
