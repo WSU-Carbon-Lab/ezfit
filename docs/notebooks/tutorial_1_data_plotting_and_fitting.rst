@@ -1,13 +1,7 @@
 Tutorial 1: Data Plotting and Fitting with Python
 ==================================================
 
-This comprehensive tutorial introduces you to data plotting and fitting using Python and ezfit.
-This tutorial is designed for beginners who are new to Python, coding, and programmatically
-interacting with data.
-
-.. note::
-
-   This tutorial is also available as a PDF: :download:`Tutorial_1.pdf <Tutorial_1.pdf>`
+Python is a high-level, cross platform, general-purpose, programming language that emphasizes code readability. It has a focus on open-source community collaboration and allows you to easily import prebuilt software bundles that facilitate powerful analyses. Because of its ease of use, it is the most widely used language in scientific computing.
 
 Learning Objectives
 -------------------
@@ -25,8 +19,7 @@ By the end of this tutorial, you will be able to:
 Your Environment
 ----------------
 
-The easiest way to get started with a project using Python is through virtual environments.
-To get started, open your project folder and use the following command:
+The easiest way to get started with a project using python is though "virtual environment's". To get started, open the windows file explorer and open your project folder in the ThawSpace. Right click inside the folder and select "Open in Terminal". Once the terminal is pulled up use the following command:
 
 .. code-block:: bash
 
@@ -64,38 +57,49 @@ To start off you will want to launch a notebook. You can do this using the follo
 
    jupyter lab
 
-This may take some time to launch, but once it does it will launch an instance of Jupyter Lab
-in your browser. Open a new Jupyter notebook by clicking on Python 3 under the notebook tab.
-Then rename the notebook.
+This may take some time to launch up, but once it does it will launch an instance of Jupyter Lab in your browser. Open a new Jupyter notebook by clicking on Python 3 under the notebook tab. Then rename the notebook.
 
 Notebooks are made of several code blocks that you can run sequentially. Click the first cell and type:
 
 .. code-block:: python
 
-   print("Hello, World!")
+   print("Hello; World")
 
-Run the cell by pressing Shift+Enter, or by clicking the play button at the top of the notebook.
-The output will be displayed below the cell.
+Run the cell by pressing shift+enter, or by clicking the play button at the top of the notebook.
 
-Some Basic Python
+The print statement returns a plain text result below the cell. Sometimes, people design fancy outputs for their objects. To access this fancy output, you can either put the object at the end of a cell and execute the cell, or write
+
+.. code-block:: python
+
+   display("Hello; World")
+
+.. note::
+
+   If you close the jupyter lab tab in your browser, or close your browser, you can scroll up in the terminal that you "jupyter lab" into, and navigate to to the selected "localhost" url.
+
+.. note::
+
+   If you close the terminal, or type "control + c" into the terminal, you will end the server running jupyter lab and will need to restart it. Ensure you are in your project folder containing your ".venv" folder. Ensure you activate the environment using ".venv\\Scripts\\activate". Then relaunch the server using the "jupyter lab" command.
+
+Some basic python
 -----------------
 
-Functions are key to scientific analysis in Python. We will make a basic power law function:
+Functions are key to scientific analysis in python. We will make a basic power law function.
 
 .. math::
 
    f(x, A, p) = A x^p
 
-In a new cell below the Hello World cell, make a new function using the following syntax:
+In a new cell below the Hello World cell, make a new function using the following syntax.
 
 .. code-block:: python
 
    # This is a comment
    # Function declarations use the syntax def my_function_name(my_param):
-   def power_law(x, a, p):  # x is the domain, a and p are other parameters
+   def power_law(x, a, p): # x is the domain, a and p are other parameters
        # After the declaration, use tabs to define the function internals
        # We use * for multiplication, and ** for exponentiation
-       my_result = a * x ** p
+       my_result = a*x**p
        return my_result
 
 Once this cell is executed, you can use the function at any point in the future. To see how that works,
@@ -107,10 +111,13 @@ make a new cell, and define variables for each of the function parameters:
    p_test = 2
    print(power_law(x=10, a=a_test, p=p_test), power_law(2, a_test, p_test))
 
-Execute the cell and make sure that it outputs "400, 16".
+Execute the cell and make sure that it outputs "400, 16"
 
-Notice you can pass any number of things into the print function. Notice that I use "x=10", "a=a_test",
-and "p=p_test" in the first, but in the second, I just pass in the parameters in the correct positional order.
+Notice you can pass any number of things into the print function.
+
+---
+
+Notice that I use "x=10", "a=a_test", and "p=p_test" in the first, but in the second, I just pass in the parameters in the correct positional order.
 
 Libraries
 ---------
@@ -135,7 +142,7 @@ Make a vector using:
    # This array contains only the 5 listed elements
    x_sparse = np.array([0, 2, 5, 7, 10])
 
-   # This array contains 100 evenly spaced elements from 0 to 10
+   # This array contains 100 evenly spaced elements from 0 - 10
    x_dense = np.linspace(0, 10, 100)
 
 Now evaluate these functions to create y arrays using the following syntax:
@@ -145,8 +152,7 @@ Now evaluate these functions to create y arrays using the following syntax:
    y_sparse = power_law(x_sparse, a_test, p_test)
    y_dense = power_law(x_dense, a_test, p_test)
 
-Add some print statements at the end of the cell, to make sure that y_sparse and y_dense arrays look
-the way you expect them to. (Try printing ``y_sparse.shape`` and ``y_dense.shape``)
+Add some print statements at the end of the cell, to make sure that y_sparse and y_dense arrays look the way you expect them to do. (Try printing y_sparse.shape, and y_dense.shape)
 
 Plotting
 --------
@@ -171,8 +177,7 @@ This comes after the range of your function:
    plt.plot(x_dense, y_dense)
    plt.plot(x_sparse, y_sparse, "o")
 
-Add a legend that labels the dense data by setting the label keyword and editing the plotting cell
-so that it reads:
+Add a legend that labels the dense data by setting the label keyword and editing the plotting cell so that it reads
 
 .. code-block:: python
 
@@ -180,24 +185,32 @@ so that it reads:
    plt.plot(x_sparse, y_sparse, "o", label="sparse")
    plt.legend()  # this function will draw the legend on the plot
 
-The legend can be moved around using the keyword ``loc``. To place it in the lower right corner,
-use the notation:
+Now, add a label to the sparse data, do this on your own
+
+The legend can be moved around using the key word loc. To place it in the lower right corner, use the notation:
 
 .. code-block:: python
 
    plt.legend(loc="lower right")
 
-To add a grid, use the grid function at the end of the plotting cell:
+To add a grid, use the grid function at the end of the plotting cell.
 
 .. code-block:: python
 
-   plt.grid(True)
+   plt.plot(x_dense, y_dense, label="dense")
+   plt.plot(x_sparse, y_sparse, "o", label="sparse")
+   plt.legend(loc="lower right")
+   plt.grid(True)  # note plt.grid() also works, but may do something you don't expect
 
-Choose a dashed "--", solid "-", dotted ":" or dot dashed "-." style for the grid, and implement it
-by setting the ``ls`` keyword in the grid function:
+Choose a dashed "--", solid "-", dotted ":" or dot dashed "-." style for the grid, and implement it by setting the ls keyword in the grid function. E.g. plt.grid(True, ls="-")
+
+Now update your plotting cell to include the grid style:
 
 .. code-block:: python
 
+   plt.plot(x_dense, y_dense, label="dense")
+   plt.plot(x_sparse, y_sparse, "o", label="sparse")
+   plt.legend(loc="lower right")
    plt.grid(True, ls="-")
 
 Set your data x-range and y-range using the following functions:
@@ -211,8 +224,30 @@ Always set your x and y axes labels with both a title and unit by adding the fol
 
 .. code-block:: python
 
+   plt.plot(x_dense, y_dense, label="dense")
+   plt.plot(x_sparse, y_sparse, "o", label="sparse")
+   plt.legend(loc="lower right")
+   plt.grid(True, ls="-")
+   plt.xlim(left=0, right=10)
+   plt.ylim(bottom=0, top=400)
    plt.xlabel("Voltage [V]")
    plt.ylabel("Current [mA]")
+
+Let's add an annotation at the spot (4,300).
+``plt.annotate("This is a test", xy=(4,300))``
+The bottom left corner of the text starts at the annotation point by default. We can add a background box to the background of the annotation.
+``plt.annotate("This is a test", xy=(4,300), bbox={"facecolor": "white"})``
+You can also add extra things to the annotation such as an arrow. To do this you need to specify the annotation xy point allong with the xytext point.
+
+.. code-block:: python
+
+   plt.annotate(
+       "This is a test",
+       xy=(5, 100),
+       xytext=(4, 300),
+       bbox={"facecolor": "white"},
+       arrowprops={"arrowstyle": "->"},
+   )
 
 If you have properly implemented all the commands above, you should be left with a plot that looks
 professional.
@@ -223,6 +258,21 @@ final function:
 
 .. code-block:: python
 
+   plt.plot(x_dense, y_dense, label="dense")
+   plt.plot(x_sparse, y_sparse, "o", label="sparse")
+   plt.legend(loc="lower right")
+   plt.grid(True, ls="-")
+   plt.xlim(left=0, right=10)
+   plt.ylim(bottom=0, top=400)
+   plt.xlabel("Voltage [V]")
+   plt.ylabel("Current [mA]")
+   plt.annotate(
+       "This is a test",
+       xy=(5, 100),
+       xytext=(4, 300),
+       bbox={"facecolor": "white"},
+       arrowprops={"arrowstyle": "->"},
+   )
    plt.savefig("my_first_python_figure.png")
 
 Make sure you print a copy and tape it into your lab notebook.
@@ -328,7 +378,7 @@ Let's load in some more test experimental data and see how it works:
 
 .. code-block:: python
 
-   df_fitting = pd.read_csv("powerlaw.csv")
+   df_data = pd.read_csv("powerlaw.csv")
 
 Display the head of this dataset to see what the data looks like.
 
@@ -336,14 +386,14 @@ Plot the data using the pandas scatterplot plotting method:
 
 .. code-block:: python
 
-   df_fitting.plot(x="x", y="y", style="o", ms=5)
+   df_data.plot(x="x", y="y", style="o", ms=5)
 
 Next, we need to learn how to plot data on a log-log scale. This is done by passing ``loglog=True``
 into the ``df.plot`` method:
 
 .. code-block:: python
 
-   df_fitting.plot(x="x", y="y", style="o", ms=5, loglog=True)
+   df_data.plot(x="x", y="y", style="o", ms=5, loglog=True)
    plt.grid(True)  # use the style you like for ls
 
 Use the plotting syntax we used previously to label the x-axis Voltage y-axis Current, giving both
@@ -377,9 +427,9 @@ Now we will do this explicitly, by manually computing the log of the x and y dat
 
 .. code-block:: python
 
-   df_fitting["logx"] = np.log10(df_fitting["x"])
-   df_fitting["logy"] = np.log10(df_fitting["y"])
-   df_fitting.plot(x="logx", y="logy", style="o")
+   df_data["logx"] = np.log10(df_data["x"])
+   df_data["logy"] = np.log10(df_data["y"])
+   df_data.plot(x="logx", y="logy", style="o")
    plt.ylabel("Log Current [log(mA)]")
    plt.xlabel("Log Voltage [log(V)]")
 
@@ -413,7 +463,7 @@ Let's make a guess for this function:
 
 .. code-block:: python
 
-   fit_result, *axes = df_fitting.fit(
+   fit_result, *axes = df_data.fit(
        power_law,   # name of your fit function
        x="x",   # experimental domain
        y="y",   # experimental data
@@ -453,7 +503,7 @@ yield more realistic uncertainties:
 
 .. code-block:: python
 
-   fit_result, *axes = df_fitting.fit(
+   fit_result, *axes = df_data.fit(
        power_law,
        x="x",
        y="y_noisy",
@@ -478,8 +528,8 @@ and plot the data along with this result:
 
 .. code-block:: python
 
-   df_fitting.plot(x="x", y="y_noisy", style="o")
-   plt.plot(df_fitting["x"], fit_result(df_fitting["x"]))
+   df_data.plot(x="x", y="y_noisy", style="o")
+   plt.plot(df_data["x"], fit_result(df_data["x"]))
    plt.xlabel("x")
    plt.ylabel("y")
    plt.legend(["Data", "Fit"])
@@ -499,14 +549,14 @@ Now we fit the line to the dataset:
 
 .. code-block:: python
 
-   line_results, *axs = df_fitting.query("x > 5").fit(
+   line_results, *axs = df_data.query("x > 5").fit(
        line,
        x="x",
        y="y_noisy"
    )
 
 This will generate a plot of only the data for x > 5. If we want to see the model compared to the data
-we did not use for fitting, we can do that using ``df_fitting.plot(...)`` along with the visualization
+we did not use for fitting, we can do that using ``df_data.plot(...)`` along with the visualization
 tools used for the last plot.
 
 Print and tape this graph into your logbook. Title it "Fit Over a Partial Range".
@@ -519,7 +569,7 @@ should look something like this:
 
 .. code-block:: python
 
-   fit_result, *axes = df_fitting.fit(
+   fit_result, *axes = df_data.fit(
        power_law,
        x="x",
        y="y_noisy_2",
@@ -568,8 +618,8 @@ command:
 
 .. code-block:: python
 
-   df_fitting.plot(x="x", y="y_noisy_2", style="o", loglog=True)
-   plt.plot(df_fitting["x"], fit_result(df_fitting["x"]), loglog=True)
+   df_data.plot(x="x", y="y_noisy_2", style="o", loglog=True)
+   plt.plot(df_data["x"], fit_result(df_data["x"]))
    plt.grid(True)
 
 Both the data and fit look like lines, but boy is that slope off! This is because the errors on the
@@ -580,8 +630,8 @@ To fix this, let's fit the log of the data to a line:
 
 .. code-block:: python
 
-   df_fitting["logy_2"] = np.log10(df_fitting["y_noisy_2"])
-   fit_result_linear, *axes = df_fitting.fit(
+   df_data["logy_2"] = np.log10(df_data["y_noisy_2"])
+   fit_result_linear, *axes = df_data.fit(
        line,   # name of your fit function
        x="logx",   # experimental domain
        y="logy_2",  # experimental data
@@ -622,14 +672,13 @@ Plot the new fit and data together:
    P_fit = fit_result_linear["m"].value
 
    # Plot original data
-   df_fitting.plot(x="x", y="y_noisy_2", style="o", loglog=True)
+   df_data.plot(x="x", y="y_noisy_2", style="o", loglog=True)
 
    # Create power law function with fitted parameters
    def power_law_fit(x):
-       return A_fit * x ** P_fit
+       return A_fit * x**P_fit
 
-   x_plot = np.logspace(np.log10(df_fitting["x"].min()),
-                        np.log10(df_fitting["x"].max()), 100)
+   x_plot = np.logspace(np.log10(df_data["x"].min()), np.log10(df_data["x"].max()), 100)
    plt.plot(x_plot, power_law_fit(x_plot), label=f"Fit: A={A_fit:.2f}, P={P_fit:.2f}")
    plt.legend()
    plt.grid(True)
