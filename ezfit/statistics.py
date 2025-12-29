@@ -42,8 +42,8 @@ def calculate_fit_statistics(
     dict[str, Any]
         Dictionary containing all calculated statistics:
         - residuals: np.ndarray - Residuals (ydata - model)
-        - chi2: float | None - Chi-squared statistic (only when sigma available)
-        - rchi2: float | None - Reduced chi-squared (only when sigma available)
+        - chi2: float - Chi-squared statistic (uses sigma=1 if errors not provided)
+        - rchi2: float | None - Reduced chi-squared (None if dof <= 0)
         - cor: np.ndarray | None - Correlation matrix of parameters
         - r_squared: float - R² (coefficient of determination)
         - pearson_r: float - Pearson correlation coefficient
@@ -60,19 +60,20 @@ def calculate_fit_statistics(
     n_params_fit = len(popt) - sum(p.fixed for p in model.params.values())  # type: ignore
     n_data = len(xdata)
 
-    # Initialize statistics
-    chi2: float | None = None
-    rchi2: float | None = None
-
-    # Calculate chi-squared statistics only when sigma is available
+    # Calculate chi-squared statistics
+    # If sigma is None, assume sigma=1 for all data points
     if sigma is not None and np.all(sigma > 0):
         safe_sigma = np.where(sigma == 0, 1e-10, sigma)
-        chi2 = float(np.sum((residuals / safe_sigma) ** 2))
-        dof = n_data - n_params_fit
-        if dof > 0:
-            rchi2 = chi2 / dof
-        else:
-            rchi2 = None
+    else:
+        # Use sigma=1 when errors are not provided
+        safe_sigma = np.ones_like(residuals)
+
+    chi2 = float(np.sum((residuals / safe_sigma) ** 2))
+    dof = n_data - n_params_fit
+    if dof > 0:
+        rchi2 = chi2 / dof
+    else:
+        rchi2 = None
 
     # Calculate correlation matrix if covariance is available
     cor: np.ndarray | None = None
@@ -136,4 +137,3 @@ def calculate_fit_statistics(
         "bic": bic,
         "aic": aic,
     }
-

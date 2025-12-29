@@ -407,9 +407,10 @@ class FitResult(TypedDict):
     residuals : np.ndarray | None
         Residuals (ydata - model(xdata, *popt)). None if not computed.
     chi2 : float | None
-        Chi-squared statistic. None if cannot be computed (when sigma is not available).
+        Chi-squared statistic. Calculated using sigma=1 when errors are not provided.
+        None only if degrees of freedom <= 0.
     rchi2 : float | None
-        Reduced chi-squared (chi2 / degrees_of_freedom). None if cannot be computed (when sigma is not available).
+        Reduced chi-squared (chi2 / degrees_of_freedom). None if degrees of freedom <= 0.
     cor : np.ndarray | None
         Correlation matrix of parameters. None if cannot be computed.
     r_squared : float | None

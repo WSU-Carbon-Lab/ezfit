@@ -344,39 +344,61 @@ class Model:
     def __repr__(self) -> str:
         """Return a compact string representation of the model."""
         name = self.func.__name__
-        lines = [f"{name}()"]
+        lines = [f"{name}()", ""]
 
+        # Parameters table
         if self.params is not None:
-            param_strs = []
-            for v, param in self.params.items():
+            lines.append("  Parameters:")
+            lines.append("    Parameter    Value          Error")
+            lines.append("    " + "-" * 40)
+            for param_name, param in self.params.items():
                 if param.fixed:
-                    param_strs.append(f"{v}={param.value:.4g}(fixed)")
+                    lines.append(
+                        f"    {param_name:<12} {param.value:12.6g}   (fixed)"
+                    )
                 else:
-                    v, e = rounded_values(param.value, param.err, 2)
-                    e_str = "N/A" if not np.isfinite(e) or np.isnan(e) else f"±{e}"
-                    param_strs.append(f"{v}={v}{e_str}")
-            lines.append("  " + ", ".join(param_strs))
+                    if not np.isfinite(param.err) or np.isnan(param.err):
+                        e_str = "N/A"
+                    else:
+                        e_str = f"{param.err:.6g}"
+                    lines.append(
+                        f"    {param_name:<12} {param.value:12.6g}   ±{e_str}"
+                    )
+            lines.append("")
 
-        # Statistics on one line
+        # Statistics
         stats = []
         if self.𝜒2 is not None:
-            stats.append(f"𝜒²={self.𝜒2:.4g}")
+            stats.append(f"𝜒²={self.𝜒2:.6g}")
         if self.r𝜒2 is not None:
-            stats.append(f"r𝜒²={self.r𝜒2:.4g}")
-        if self.𝜒2 is None:
-            if self.r_squared is not None:
-                stats.append(f"R²={self.r_squared:.4f}")
-            if self.rmse is not None:
-                stats.append(f"RMSE={self.rmse:.4g}")
-            if self.bic is not None and np.isfinite(self.bic):
-                stats.append(f"BIC={self.bic:.4g}")
-            if self.aic is not None and np.isfinite(self.aic):
-                stats.append(f"AIC={self.aic:.4g}")
+            stats.append(f"r𝜒²={self.r𝜒2:.6g}")
+        if self.r_squared is not None:
+            stats.append(f"R²={self.r_squared:.6f}")
+        if self.rmse is not None:
+            stats.append(f"RMSE={self.rmse:.6g}")
+        if self.bic is not None and np.isfinite(self.bic):
+            stats.append(f"BIC={self.bic:.6g}")
+        if self.aic is not None and np.isfinite(self.aic):
+            stats.append(f"AIC={self.aic:.6g}")
 
         if stats:
-            lines.append("  " + ", ".join(stats))
+            lines.append("  Statistics:")
+            lines.append("    " + ", ".join(stats))
+            lines.append("")
 
-        return "\n".join(lines)
+        # Covariance and correlation matrices
+        if self.params is not None and len(self.params) > 0:
+            param_names = list(self.params.keys())
+            if self.cov is not None:
+                lines.append("  Covariance Matrix:")
+                lines.append(self._matrix_to_text(self.cov, param_names, indent="    "))
+                lines.append("")
+            if self.cor is not None:
+                lines.append("  Correlation Matrix:")
+                lines.append(self._matrix_to_text(self.cor, param_names, indent="    "))
+                lines.append("")
+
+        return "\n".join(lines).rstrip()
 
     def _repr_html_(self) -> str:
         """Return compact HTML representation for Jupyter notebooks."""
@@ -388,79 +410,84 @@ class Model:
         h3_style = "margin: 0 0 8px 0; color: #0066cc; font-size: 1.1em;"
         html_parts.append(f'<h3 style="{h3_style}"><strong>{name}()</strong></h3>')
 
-        # Combined parameters and statistics table
-        table_style = (
-            "border-collapse: collapse; margin-bottom: 8px; font-size: 0.95em;"
-        )
-        html_parts.append(f'<table style="{table_style}">')
-
-        # Parameters row
+        # Parameters table
         if self.params is not None:
-            param_cells = []
+            html_parts.append('<h4 style="color: #333; margin: 8px 0 4px 0;">Parameters</h4>')
+            table_style = (
+                "border-collapse: collapse; margin-bottom: 12px; font-size: 0.95em;"
+            )
+            html_parts.append(f'<table style="{table_style}">')
+
+            # Header row
+            th_style = (
+                "padding: 6px 10px; text-align: left; border: 1px solid #ddd; "
+                "background-color: #f0f0f0; font-weight: bold;"
+            )
+            html_parts.append(
+                f"<tr>"
+                f'<th style="{th_style}">Parameter</th>'
+                f'<th style="{th_style}">Value</th>'
+                f'<th style="{th_style}">Error</th>'
+                f"</tr>"
+            )
+
+            # Data rows
+            td_style = "padding: 6px 10px; border: 1px solid #ddd;"
             for param_name, param in self.params.items():
                 if param.fixed:
-                    fixed_span = "<span style='color:#888;'>(fixed)</span>"
-                    param_str = f"{param_name}={param.value:.4g}{fixed_span}"
+                    value_str = f"{param.value:.6g}"
+                    error_str = '<span style="color:#888;">(fixed)</span>'
                 else:
-                    v, e = rounded_values(param.value, param.err, 2)
-                    e_str = (
-                        "" if not np.isfinite(e) or np.isnan(e) or e == 0 else f"±{e}"
-                    )
-                    param_str = f"{param_name}={v}{e_str}"
-                param_cells.append(param_str)
+                    value_str = f"{param.value:.6g}"
+                    if not np.isfinite(param.err) or np.isnan(param.err):
+                        error_str = "N/A"
+                    else:
+                        error_str = f"±{param.err:.6g}"
 
-            td_style = "padding: 4px 8px; border: 1px solid #ddd;"
-            td_bold = f"{td_style} font-weight: bold; background-color: #f5f5f5;"
-            html_parts.append(
-                f"<tr>"
-                f'<td style="{td_bold}">Parameters:</td>'
-                f'<td style="{td_style}">{" ".join(param_cells)}</td>'
-                f"</tr>"
-            )
+                html_parts.append(
+                    f"<tr>"
+                    f'<td style="{td_style}"><strong>{param_name}</strong></td>'
+                    f'<td style="{td_style}">{value_str}</td>'
+                    f'<td style="{td_style}">{error_str}</td>'
+                    f"</tr>"
+                )
+            html_parts.append("</table>")
 
-        # Statistics row
+        # Statistics
         stats = []
         if self.𝜒2 is not None:
-            stats.append(f"𝜒²={self.𝜒2:.4g}")
+            stats.append(f"𝜒²={self.𝜒2:.6g}")
         if self.r𝜒2 is not None:
-            stats.append(f"r𝜒²={self.r𝜒2:.4g}")
-        if self.𝜒2 is None:
-            if self.r_squared is not None:
-                stats.append(f"R²={self.r_squared:.4f}")
-            if self.rmse is not None:
-                stats.append(f"RMSE={self.rmse:.4g}")
-            if self.bic is not None and np.isfinite(self.bic):
-                stats.append(f"BIC={self.bic:.4g}")
-            if self.aic is not None and np.isfinite(self.aic):
-                stats.append(f"AIC={self.aic:.4g}")
+            stats.append(f"r𝜒²={self.r𝜒2:.6g}")
+        if self.r_squared is not None:
+            stats.append(f"R²={self.r_squared:.6f}")
+        if self.rmse is not None:
+            stats.append(f"RMSE={self.rmse:.6g}")
+        if self.bic is not None and np.isfinite(self.bic):
+            stats.append(f"BIC={self.bic:.6g}")
+        if self.aic is not None and np.isfinite(self.aic):
+            stats.append(f"AIC={self.aic:.6g}")
 
         if stats:
-            td_style = "padding: 4px 8px; border: 1px solid #ddd;"
-            td_bold = f"{td_style} font-weight: bold; background-color: #f5f5f5;"
-            html_parts.append(
-                f"<tr>"
-                f'<td style="{td_bold}">Statistics:</td>'
-                f'<td style="{td_style}">{", ".join(stats)}</td>'
-                f"</tr>"
-            )
+            html_parts.append('<h4 style="color: #333; margin: 8px 0 4px 0;">Statistics</h4>')
+            html_parts.append(f'<p style="margin: 0 0 12px 0;">{", ".join(stats)}</p>')
 
-        html_parts.append("</table>")
-
-        # Compact matrices side by side if both exist
+        # Covariance and correlation matrices
         if self.params is not None and len(self.params) > 0:
             param_names = list(self.params.keys())
             matrices = []
             if self.cov is not None:
-                matrices.append(("Cov", self.cov))
+                matrices.append(("Covariance Matrix", self.cov))
             if self.cor is not None:
-                matrices.append(("Corr", self.cor))
+                matrices.append(("Correlation Matrix", self.cor))
 
             if matrices:
-                matrix_container_style = "display: flex; gap: 15px; margin-top: 8px;"
+                matrix_container_style = "display: flex; gap: 20px; margin-top: 8px;"
                 html_parts.append(f'<div style="{matrix_container_style}">')
                 for label, matrix in matrices:
+                    html_parts.append('<div>')
                     html_parts.append(
-                        f'<div><strong style="font-size: 0.9em;">{label}:</strong>'
+                        f'<h4 style="color: #333; margin: 8px 0 4px 0; font-size: 0.95em;">{label}</h4>'
                     )
                     html_parts.append(self._matrix_to_html(matrix, param_names))
                     html_parts.append("</div>")
@@ -469,12 +496,41 @@ class Model:
         html_parts.append("</div>")
         return "".join(html_parts)
 
+    def _matrix_to_text(
+        self, matrix: np.ndarray, param_names: list[str], indent: str = ""
+    ) -> str:
+        """Convert a numpy matrix to formatted text table."""
+        lines = []
+        # Calculate column widths
+        col_width = max(len(name) for name in param_names) + 2
+        num_width = 12
+
+        # Header row
+        header = indent + " " * col_width
+        for name in param_names:
+            header += f"{name:>{num_width}}"
+        lines.append(header)
+        lines.append(indent + "-" * (col_width + num_width * len(param_names)))
+
+        # Data rows
+        with np.printoptions(suppress=True, precision=6):
+            for i, name in enumerate(param_names):
+                row = indent + f"{name:<{col_width}}"
+                for j in range(len(param_names)):
+                    val = matrix[i, j]
+                    row += f"{val:>{num_width}.6g}"
+                lines.append(row)
+
+        return "\n".join(lines)
+
     def _matrix_to_html(self, matrix: np.ndarray, param_names: list[str]) -> str:
-        """Convert a numpy matrix to compact HTML table."""
-        table_style = "border-collapse: collapse; font-size: 0.85em;"
+        """Convert a numpy matrix to HTML table."""
+        table_style = (
+            "border-collapse: collapse; font-size: 0.9em; margin-bottom: 8px;"
+        )
         html_parts = [f'<table style="{table_style}">']
         th_style = (
-            "padding: 3px 6px; text-align: center; border: 1px solid #ddd; "
+            "padding: 6px 10px; text-align: center; border: 1px solid #ddd; "
             "background-color: #f0f0f0; font-weight: bold;"
         )
         html_parts.append(f'<tr><th style="{th_style}"></th>')
@@ -482,15 +538,15 @@ class Model:
             html_parts.append(f'<th style="{th_style}">{name}</th>')
         html_parts.append("</tr>")
 
-        td_style = "padding: 3px 6px; border: 1px solid #ddd; text-align: right;"
+        td_style = "padding: 6px 10px; border: 1px solid #ddd; text-align: right;"
         td_bold = f"{td_style} background-color: #f0f0f0; font-weight: bold;"
 
-        with np.printoptions(suppress=True, precision=3):
+        with np.printoptions(suppress=True, precision=6):
             for i, name in enumerate(param_names):
                 html_parts.append(f"<tr><td style='{td_bold}'>{name}</td>")
                 for j in range(len(param_names)):
                     val = matrix[i, j]
-                    html_parts.append(f'<td style="{td_style}">{val:.3f}</td>')
+                    html_parts.append(f'<td style="{td_style}">{val:.6g}</td>')
                 html_parts.append("</tr>")
         html_parts.append("</table>")
         return "".join(html_parts)
