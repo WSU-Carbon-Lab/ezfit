@@ -29,7 +29,7 @@ ezfit requires:
 - scikit-learn >= 1.3.0
 
 Optional Dependencies
---------------------
+---------------------
 
 For MCMC fitting and advanced diagnostics:
 

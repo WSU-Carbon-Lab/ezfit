@@ -107,15 +107,6 @@ Examples
    examples/constrained_fitting
    examples/mcmc_analysis
 
-Reference
----------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Reference
-
-   api/optimizers
-
 Indices and tables
 ------------------
 

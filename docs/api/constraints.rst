@@ -11,16 +11,22 @@ Constraint Functions
 --------------------
 
 .. autofunction:: ezfit.constraints.less_than
+   :no-index:
 
 .. autofunction:: ezfit.constraints.greater_than
+   :no-index:
 
 .. autofunction:: ezfit.constraints.sum_less_than
+   :no-index:
 
 .. autofunction:: ezfit.constraints.sum_greater_than
+   :no-index:
 
 .. autofunction:: ezfit.constraints.product_equals
+   :no-index:
 
 .. autofunction:: ezfit.constraints.parse_constraint_string
+   :no-index:
 
 Examples
 --------

@@ -14,31 +14,37 @@ Linear
 ~~~~~~
 
 .. autofunction:: ezfit.functions.linear
+   :no-index:
 
 Exponential
 ~~~~~~~~~~~
 
 .. autofunction:: ezfit.functions.exponential
+   :no-index:
 
 Power Law
 ~~~~~~~~~
 
 .. autofunction:: ezfit.functions.power_law
+   :no-index:
 
 Gaussian
 ~~~~~~~~
 
 .. autofunction:: ezfit.functions.gaussian
+   :no-index:
 
 Lorentzian
 ~~~~~~~~~~
 
 .. autofunction:: ezfit.functions.lorentzian
+   :no-index:
 
 Pseudo-Voigt
 ~~~~~~~~~~~~
 
 .. autofunction:: ezfit.functions.pseudo_voigt
+   :no-index:
 
 Examples
 --------

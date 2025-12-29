@@ -11,12 +11,16 @@ Functions
 ---------
 
 .. autofunction:: ezfit.visualization.plot_corner
+   :no-index:
 
 .. autofunction:: ezfit.visualization.plot_trace
+   :no-index:
 
 .. autofunction:: ezfit.visualization.plot_posterior
+   :no-index:
 
 .. autofunction:: ezfit.visualization.plot_arviz_summary
+   :no-index:
 
 Examples
 --------

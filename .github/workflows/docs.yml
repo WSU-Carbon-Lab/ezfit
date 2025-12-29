@@ -36,11 +36,15 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          uv sync --all-extras --python=3.13 -q
+          uv sync --all-extras --python=3.13
 
       - name: Verify package installation
         run: |
           uv run python -c "import ezfit; print('ezfit package imported successfully')"
+
+      - name: Verify documentation dependencies
+        run: |
+          uv run python -c "import sphinx; import myst_nb; import furo; print('Documentation dependencies verified')"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

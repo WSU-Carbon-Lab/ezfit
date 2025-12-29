@@ -130,7 +130,7 @@ Best Practices
 5. **Use corner plots** to understand parameter relationships
 
 Example Workflow
----------------
+-----------------
 
 .. code-block:: python
 

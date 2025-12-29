@@ -31,7 +31,7 @@ def power_law(x, a, b):
 
     References
     ----------
-    .. [1] Power law. Wikipedia. https://en.wikipedia.org/wiki/Power_law
+    .. [power_law_ref] Power law. Wikipedia. https://en.wikipedia.org/wiki/Power_law
 
     Examples
     --------
@@ -70,8 +70,8 @@ def exponential(x, a, b):
 
     References
     ----------
-    .. [1] Exponential function. Wikipedia. https://en.wikipedia.org/wiki/Exponential_function
-    .. [2] Exponential decay. Wikipedia. https://en.wikipedia.org/wiki/Exponential_decay
+    .. [exp_func_ref] Exponential function. Wikipedia. https://en.wikipedia.org/wiki/Exponential_function
+    .. [exp_decay_ref] Exponential decay. Wikipedia. https://en.wikipedia.org/wiki/Exponential_decay
 
     Examples
     --------
@@ -119,8 +119,8 @@ def gaussian(x, amplitude, center, fwhm):
 
     References
     ----------
-    .. [1] Normal distribution. Wikipedia. https://en.wikipedia.org/wiki/Normal_distribution
-    .. [2] Gaussian function. Wikipedia. https://en.wikipedia.org/wiki/Gaussian_function
+    .. [gauss_norm_ref] Normal distribution. Wikipedia. https://en.wikipedia.org/wiki/Normal_distribution
+    .. [gauss_func_ref] Gaussian function. Wikipedia. https://en.wikipedia.org/wiki/Gaussian_function
 
     Examples
     --------
@@ -170,8 +170,8 @@ def lorentzian(x, amplitude, center, fwhm):
 
     References
     ----------
-    .. [1] Cauchy distribution. Wikipedia. https://en.wikipedia.org/wiki/Cauchy_distribution
-    .. [2] Spectral line shape. Wikipedia. https://en.wikipedia.org/wiki/Spectral_line_shape#Lorentzian
+    .. [lorentz_cauchy_ref] Cauchy distribution. Wikipedia. https://en.wikipedia.org/wiki/Cauchy_distribution
+    .. [lorentz_line_ref] Spectral line shape. Wikipedia. https://en.wikipedia.org/wiki/Spectral_line_shape#Lorentzian
 
     Examples
     --------
@@ -231,8 +231,8 @@ def pseudo_voigt(x, height, center, fwhm, eta):
 
     References
     ----------
-    .. [1] Voigt profile. Wikipedia. https://en.wikipedia.org/wiki/Voigt_profile
-    .. [2] Pseudo-Voigt profile. Wikipedia. https://en.wikipedia.org/wiki/Voigt_profile#Pseudo-Voigt_approximation
+    .. [voigt_profile_ref] Voigt profile. Wikipedia. https://en.wikipedia.org/wiki/Voigt_profile
+    .. [pseudo_voigt_ref] Pseudo-Voigt profile. Wikipedia. https://en.wikipedia.org/wiki/Voigt_profile#Pseudo-Voigt_approximation
 
     Examples
     --------
@@ -280,8 +280,8 @@ def linear(x, m, b):
 
     References
     ----------
-    .. [1] Linear function. Wikipedia. https://en.wikipedia.org/wiki/Linear_function
-    .. [2] Linear equation. Wikipedia. https://en.wikipedia.org/wiki/Linear_equation
+    .. [linear_func_ref] Linear function. Wikipedia. https://en.wikipedia.org/wiki/Linear_function
+    .. [linear_eq_ref] Linear equation. Wikipedia. https://en.wikipedia.org/wiki/Linear_equation
 
     Examples
     --------
